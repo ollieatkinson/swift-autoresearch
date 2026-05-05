@@ -1,6 +1,23 @@
 set -euo pipefail
 
-cd "$(dirname "$0")/../.."
+example_dir="$(cd "$(dirname "$0")" && pwd)"
+repo_dir="$(cd "$example_dir/../.." && pwd)"
+candidate="$example_dir/candidate.sh"
+
+# shellcheck source=/dev/null
+source "$candidate"
+
+: "${LEARNING_RATE:?candidate.sh must set LEARNING_RATE}"
+: "${WEIGHT_DECAY:?candidate.sh must set WEIGHT_DECAY}"
+: "${MAX_SEQ_LEN:?candidate.sh must set MAX_SEQ_LEN}"
+: "${DEVICE_BATCH_SIZE:?candidate.sh must set DEVICE_BATCH_SIZE}"
+: "${TOTAL_BATCH_SIZE:?candidate.sh must set TOTAL_BATCH_SIZE}"
+: "${MLX_LAYERS:?candidate.sh must set MLX_LAYERS}"
+: "${MLX_DIM:?candidate.sh must set MLX_DIM}"
+: "${MLX_HEADS:?candidate.sh must set MLX_HEADS}"
+: "${MLX_MLP_DIM:?candidate.sh must set MLX_MLP_DIM}"
+
+cd "$repo_dir"
 
 cache_dir=".build/tiny-lab-notes-cache"
 
@@ -13,11 +30,13 @@ swift run autoresearch train \
   --mlx-device gpu \
   --cache-dir "$cache_dir" \
   --time-budget 1 \
-  --max-seq-len 128 \
-  --device-batch-size 4 \
-  --total-batch-size 512 \
+  --max-seq-len "$MAX_SEQ_LEN" \
+  --device-batch-size "$DEVICE_BATCH_SIZE" \
+  --total-batch-size "$TOTAL_BATCH_SIZE" \
   --eval-tokens 4096 \
-  --mlx-layers 1 \
-  --mlx-dim 32 \
-  --mlx-heads 4 \
-  --mlx-mlp-dim 64
+  --learning-rate "$LEARNING_RATE" \
+  --weight-decay "$WEIGHT_DECAY" \
+  --mlx-layers "$MLX_LAYERS" \
+  --mlx-dim "$MLX_DIM" \
+  --mlx-heads "$MLX_HEADS" \
+  --mlx-mlp-dim "$MLX_MLP_DIM"

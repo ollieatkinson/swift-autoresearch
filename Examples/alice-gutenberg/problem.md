@@ -6,8 +6,7 @@ evaluator: bash evaluate.sh
 timeout_seconds: 180
 results: results.tsv
 mutable:
-  - Sources/Autoresearch
-  - Sources/autoresearch-cli
+  - candidate.sh
 ---
 
 # Alice Gutenberg
@@ -17,12 +16,15 @@ Project Gutenberg text of Lewis Carroll's `Alice's Adventures in Wonderland`.
 
 The objective is to lower validation bits per byte on a small English corpus
 under a fixed wall-clock budget. The problem document and evaluator are the
-fixed contract. The agent may edit only the mutable paths listed in the front
-matter, commit each candidate, run the evaluator, and keep or discard by
-`val_bpb`.
+fixed contract. The agent may edit only `candidate.sh`, commit each candidate,
+run the evaluator, and keep or discard by `val_bpb`.
 
 The evaluator downloads the UTF-8 plain-text eBook from Project Gutenberg on
 first run and caches it under `.build/alice-gutenberg/`.
+
+`candidate.sh` is the mutable research surface. It controls MLX model size,
+batching, optimizer knobs, and sequence length. The evaluator keeps the time
+budget, validation split, metric, and result logging fixed.
 
 ## Run One Evaluation
 
@@ -30,6 +32,17 @@ first run and caches it under `.build/alice-gutenberg/`.
 swift run autoresearch evaluate \
   --problem Examples/alice-gutenberg/problem.md \
   --description baseline
+```
+
+## Try A Candidate Edit
+
+Edit `Examples/alice-gutenberg/candidate.sh`, for example by increasing
+`LEARNING_RATE` or changing `MLX_DIM` and `MLX_MLP_DIM`, then run:
+
+```bash
+swift run autoresearch evaluate \
+  --problem Examples/alice-gutenberg/problem.md \
+  --description "tune candidate knobs"
 ```
 
 ## Manual Data Prep
@@ -46,17 +59,20 @@ swift run autoresearch prepare \
 ## Manual MLX Training Run
 
 ```bash
+source Examples/alice-gutenberg/candidate.sh
 swift run autoresearch train \
   --backend mlx \
   --mlx-device gpu \
   --cache-dir .build/alice-gutenberg/cache \
   --time-budget 5 \
-  --max-seq-len 128 \
-  --device-batch-size 4 \
-  --total-batch-size 512 \
+  --max-seq-len "$MAX_SEQ_LEN" \
+  --device-batch-size "$DEVICE_BATCH_SIZE" \
+  --total-batch-size "$TOTAL_BATCH_SIZE" \
   --eval-tokens 4096 \
-  --mlx-layers 1 \
-  --mlx-dim 32 \
-  --mlx-heads 4 \
-  --mlx-mlp-dim 64
+  --learning-rate "$LEARNING_RATE" \
+  --weight-decay "$WEIGHT_DECAY" \
+  --mlx-layers "$MLX_LAYERS" \
+  --mlx-dim "$MLX_DIM" \
+  --mlx-heads "$MLX_HEADS" \
+  --mlx-mlp-dim "$MLX_MLP_DIM"
 ```

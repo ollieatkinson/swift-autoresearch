@@ -6,8 +6,7 @@ evaluator: bash evaluate.sh
 timeout_seconds: 120
 results: results.tsv
 mutable:
-  - Sources/Autoresearch
-  - Sources/autoresearch-cli
+  - candidate.sh
 ---
 
 # Tiny Lab Notes
@@ -21,8 +20,11 @@ backend can be tested with short commands and no network access.
 
 The problem document is the immutable contract. The evaluator command above is
 fixed and emits the metric named in the front matter. The agent may edit only
-the mutable paths listed in the front matter, commit each candidate, run the
-evaluator, and keep or discard the commit based on validation bits per byte.
+`candidate.sh`, commit each candidate, run the evaluator, and keep or discard
+the commit based on validation bits per byte.
+
+`candidate.sh` starts with a deliberately conservative learning rate. A simple
+first experiment is to increase `LEARNING_RATE` and rerun the evaluator.
 
 ## Evaluate
 
@@ -43,17 +45,20 @@ swift run autoresearch prepare \
 ## Train The MLX Baseline
 
 ```bash
+source Examples/tiny-lab-notes/candidate.sh
 swift run autoresearch train \
   --backend mlx \
   --mlx-device gpu \
   --cache-dir .build/tiny-lab-notes-cache \
-  --time-budget 5 \
-  --max-seq-len 128 \
-  --device-batch-size 4 \
-  --total-batch-size 512 \
+  --time-budget 1 \
+  --max-seq-len "$MAX_SEQ_LEN" \
+  --device-batch-size "$DEVICE_BATCH_SIZE" \
+  --total-batch-size "$TOTAL_BATCH_SIZE" \
   --eval-tokens 4096 \
-  --mlx-layers 1 \
-  --mlx-dim 32 \
-  --mlx-heads 4 \
-  --mlx-mlp-dim 64
+  --learning-rate "$LEARNING_RATE" \
+  --weight-decay "$WEIGHT_DECAY" \
+  --mlx-layers "$MLX_LAYERS" \
+  --mlx-dim "$MLX_DIM" \
+  --mlx-heads "$MLX_HEADS" \
+  --mlx-mlp-dim "$MLX_MLP_DIM"
 ```

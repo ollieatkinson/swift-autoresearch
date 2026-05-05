@@ -78,7 +78,7 @@ evaluator: bash evaluate.sh
 timeout_seconds: 600
 results: results.tsv
 mutable:
-  - train.py
+  - candidate.sh
 ---
 ```
 
@@ -102,10 +102,33 @@ commit	score	memory_gb	status	description
 `discard` for a non-improvement, and `crash` when the evaluator exits non-zero,
 times out, or does not print the metric.
 
+## Reading Output
+
+For MLX training examples, `val_bpb` is the optimization metric and lower is
+better. It is validation bits per byte, so it measures how well the model
+predicts held-out bytes after the fixed wall-clock training budget. Use it to
+decide whether a candidate should be kept.
+
+The live training lines are diagnostic. `loss` shows current training loss,
+`tok/sec` shows throughput, `dt` shows step time, `epoch` shows data progress,
+and `remaining` shows the wall-clock budget left. The final summary fields such
+as `num_steps`, `total_tokens_M`, `training_seconds`, and `peak_vram_mb` explain
+what fit inside the budget. They are useful for understanding why a candidate
+won or lost, but `val_bpb` is the metric used by the loop.
+
+For generic problem examples, the final parsed metric and `status` are the
+important loop output. The run log keeps the evaluator's full stdout and stderr.
+For the North Yorkshire example, `score` is maximized, `best_hypothesis` names
+the strongest generated claim, `a` and `b` are the two compared groups, counts
+and shares show the observed proportions, and `z_score`, `p_value`, `lift`, and
+`effect_size` explain the signal behind the score.
+
 ## Examples
 
 The examples are intentionally separate. Each problem owns its own immutable
-`problem.md`, fixed `evaluate.sh`, cache directory, and `results.tsv`.
+`problem.md`, fixed `evaluate.sh`, mutable `candidate.sh`, cache directory, and
+`results.tsv`. The examples do not mutate the package implementation; the agent
+mutates only example-local candidate files.
 
 ### Alice Gutenberg
 
@@ -113,6 +136,12 @@ This is the main silly public-data example. It uses the Project Gutenberg
 plain-text UTF-8 edition of `Alice's Adventures in Wonderland`, eBook #11:
 
 <https://www.gutenberg.org/ebooks/11>
+
+The only mutable file is
+[Examples/alice-gutenberg/candidate.sh](Examples/alice-gutenberg/candidate.sh).
+It is intentionally small: the agent can change MLX model size, batch size,
+sequence length, learning rate, and weight decay without touching the
+`autoresearch` package source.
 
 1. Read the immutable problem contract:
 
@@ -136,8 +165,8 @@ plain-text UTF-8 edition of `Alice's Adventures in Wonderland`, eBook #11:
    ```
 
 4. Start an agent loop on a fresh branch. The problem document and evaluator
-   stay fixed. The agent mutates only paths listed under `mutable`, commits a
-   candidate, runs:
+   stay fixed. The agent mutates only `Examples/alice-gutenberg/candidate.sh`,
+   commits a candidate, runs:
 
    ```bash
    swift run autoresearch evaluate \
@@ -152,19 +181,22 @@ plain-text UTF-8 edition of `Alice's Adventures in Wonderland`, eBook #11:
 The evaluator performs the concrete MLX run:
 
 ```bash
+source Examples/alice-gutenberg/candidate.sh
 swift run autoresearch train \
   --backend mlx \
   --mlx-device gpu \
   --cache-dir .build/alice-gutenberg/cache \
   --time-budget 5 \
-  --max-seq-len 128 \
-  --device-batch-size 4 \
-  --total-batch-size 512 \
+  --max-seq-len "$MAX_SEQ_LEN" \
+  --device-batch-size "$DEVICE_BATCH_SIZE" \
+  --total-batch-size "$TOTAL_BATCH_SIZE" \
   --eval-tokens 4096 \
-  --mlx-layers 1 \
-  --mlx-dim 32 \
-  --mlx-heads 4 \
-  --mlx-mlp-dim 64
+  --learning-rate "$LEARNING_RATE" \
+  --weight-decay "$WEIGHT_DECAY" \
+  --mlx-layers "$MLX_LAYERS" \
+  --mlx-dim "$MLX_DIM" \
+  --mlx-heads "$MLX_HEADS" \
+  --mlx-mlp-dim "$MLX_MLP_DIM"
 ```
 
 ### Tiny Lab Notes
@@ -178,7 +210,32 @@ swift run autoresearch evaluate \
 ```
 
 It is useful for checking the loop quickly, but it is too small to be an
-interesting optimization target.
+interesting optimization target. Its mutable file is
+[Examples/tiny-lab-notes/candidate.sh](Examples/tiny-lab-notes/candidate.sh),
+which starts with a deliberately conservative learning rate so an improvement
+is easy to demonstrate. A first candidate edit is changing
+`LEARNING_RATE=0.0001` to `LEARNING_RATE=0.001`.
+
+### North Yorkshire Crime Hypotheses
+
+This example is a self-contained open-data hypothesis search. It uses the
+Police.uk street-level crime API catalogued by data.gov.uk, caches a fixed slice
+of January-March 2024 data around York, Harrogate, Scarborough, and
+Northallerton, and scores hypotheses from a mutable local Python file:
+
+```bash
+swift run autoresearch evaluate \
+  --problem Examples/uk-crime-hypotheses/problem.md \
+  --description baseline
+```
+
+Only [Examples/uk-crime-hypotheses/candidate.py](Examples/uk-crime-hypotheses/candidate.py)
+is mutable. The fixed evaluator owns the data download, aggregation, statistical
+test, and scoring. The checked-in candidate loops over
+`context["top_categories"]`, `context["places"]`, named town comparisons, and
+single-month slices. A useful candidate edit is to change that search strategy:
+add different category filters, compare lower shares as well as higher shares,
+or focus on recent-vs-earlier movement.
 
 ### Other Problem Shapes
 
@@ -187,7 +244,7 @@ strategy, data-cleaning rules, or model hyperparameters. Keep the same split:
 
 - `problem.md`: immutable goal, metric, direction, timeout, mutable paths.
 - `evaluate.sh`: fixed evaluator that prints `metric: value`.
-- mutable files: the candidate surface the agent can edit.
+- `candidate.sh`: mutable candidate code/config the agent can edit.
 - `results.tsv`: uncommitted experiment log.
 
 ## What Is Ported
