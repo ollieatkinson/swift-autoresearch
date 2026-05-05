@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fixed evaluator for the North Yorkshire Crime Hypotheses example."""
+"""Fixed evaluator for the North Yorkshire Crime Hypotheses example.
+
+The mutable candidate sees only the discovery months. This evaluator then
+checks the selected claim on a held-out month.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-DATES = ["2024-01", "2024-02", "2024-03"]
+DISCOVERY_DATES = ["2024-01", "2024-02"]
+HOLDOUT_DATES = ["2024-03"]
+ALL_DATES = DISCOVERY_DATES + HOLDOUT_DATES
 LOCATIONS = {
     "york": (53.9590, -1.0815),
     "harrogate": (53.9915, -1.5412),
@@ -40,9 +46,8 @@ class Aggregate:
 
 
 @dataclass(frozen=True)
-class ScoredHypothesis:
+class PairScore:
     name: str
-    score: float
     category: str
     a_label: str
     b_label: str
@@ -52,48 +57,63 @@ class ScoredHypothesis:
     z_score: float
     p_value: float
     effect_size: float
+    score: float
 
 
 def main() -> int:
     records = load_records()
-    context = build_context(records)
+    context = build_discovery_context(records)
     candidate = load_candidate()
-    hypotheses = list(candidate.hypotheses(context))
+    claim = candidate.claim(context)
 
-    if not hypotheses:
-        print("No hypotheses returned by candidate.py", file=sys.stderr)
+    if not isinstance(claim, dict):
+        print("candidate.py claim(context) must return a dictionary", file=sys.stderr)
         return 2
 
-    scored = []
-    for hypothesis in hypotheses:
-        try:
-            scored.append(score_hypothesis(hypothesis, records))
-        except Exception as error:
-            print(f"skipped_hypothesis: {hypothesis.get('name', '<unnamed>')} ({error})", file=sys.stderr)
-
-    if not scored:
-        print("No hypotheses could be scored.", file=sys.stderr)
+    try:
+        discovery = score_claim(claim, records, DISCOVERY_DATES)
+        holdout = score_claim(claim, records, HOLDOUT_DATES)
+    except Exception as error:
+        print(f"Could not score claim: {error}", file=sys.stderr)
         return 2
 
-    best = max(scored, key=lambda item: item.score)
+    score = holdout.score if discovery.score > 0 and holdout.score > 0 else 0.0
+
     print("---")
-    print(f"score: {best.score:.6f}")
-    print(f"best_hypothesis: {best.name}")
-    print(f"category: {best.category}")
-    print(f"a: {best.a_label}")
-    print(f"b: {best.b_label}")
-    print(f"a_count: {best.a.count}")
-    print(f"a_total: {best.a.total}")
-    print(f"a_share: {best.a.share:.6f}")
-    print(f"b_count: {best.b.count}")
-    print(f"b_total: {best.b.total}")
-    print(f"b_share: {best.b.share:.6f}")
-    print(f"effect_size: {best.effect_size:.6f}")
-    print(f"lift: {best.lift:.6f}")
-    print(f"z_score: {best.z_score:.6f}")
-    print(f"p_value: {best.p_value:.6g}")
-    print(f"hypotheses_scored: {len(scored)}")
-    print(f"records_months: {len(DATES)}")
+    print(f"score: {score:.6f}")
+    print("validation: candidate saw Jan-Feb only; evaluator scored March only")
+    print(f"claim: {discovery.name}")
+    if claim.get("rationale"):
+        print(f"rationale: {claim['rationale']}")
+    print(f"category: {discovery.category}")
+    print(f"a: {discovery.a_label}")
+    print(f"b: {discovery.b_label}")
+    print(f"discovery_months: {','.join(DISCOVERY_DATES)}")
+    print(f"discovery_a_count: {discovery.a.count}")
+    print(f"discovery_a_total: {discovery.a.total}")
+    print(f"discovery_a_share: {discovery.a.share:.6f}")
+    print(f"discovery_b_count: {discovery.b.count}")
+    print(f"discovery_b_total: {discovery.b.total}")
+    print(f"discovery_b_share: {discovery.b.share:.6f}")
+    print(f"discovery_effect_size: {discovery.effect_size:.6f}")
+    print(f"discovery_lift: {discovery.lift:.6f}")
+    print(f"discovery_z_score: {discovery.z_score:.6f}")
+    print(f"discovery_p_value: {discovery.p_value:.6g}")
+    print(f"discovery_score: {discovery.score:.6f}")
+    print(f"holdout_months: {','.join(HOLDOUT_DATES)}")
+    print(f"holdout_a_count: {holdout.a.count}")
+    print(f"holdout_a_total: {holdout.a.total}")
+    print(f"holdout_a_share: {holdout.a.share:.6f}")
+    print(f"holdout_b_count: {holdout.b.count}")
+    print(f"holdout_b_total: {holdout.b.total}")
+    print(f"holdout_b_share: {holdout.b.share:.6f}")
+    print(f"holdout_effect_size: {holdout.effect_size:.6f}")
+    print(f"holdout_lift: {holdout.lift:.6f}")
+    print(f"holdout_z_score: {holdout.z_score:.6f}")
+    print(f"holdout_p_value: {holdout.p_value:.6g}")
+    print(f"holdout_score: {holdout.score:.6f}")
+    print(f"records_discovery_months: {len(DISCOVERY_DATES)}")
+    print(f"records_holdout_months: {len(HOLDOUT_DATES)}")
     print(f"records_places: {len(LOCATIONS)}")
     return 0
 
@@ -104,14 +124,14 @@ def load_candidate():
         raise RuntimeError(f"Could not load {CANDIDATE_PATH}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    if not hasattr(module, "hypotheses"):
-        raise RuntimeError("candidate.py must define hypotheses(context)")
+    if not hasattr(module, "claim"):
+        raise RuntimeError("candidate.py must define claim(context)")
     return module
 
 
 def load_records() -> list[dict]:
     records = []
-    for date in DATES:
+    for date in ALL_DATES:
         for place, (lat, lng) in LOCATIONS.items():
             crimes = fetch_crimes(place=place, date=date, lat=lat, lng=lng)
             counts = Counter(crime.get("category", "unknown") for crime in crimes)
@@ -152,35 +172,44 @@ def fetch_crimes(place: str, date: str, lat: float, lng: float) -> list[dict]:
     return data
 
 
-def build_context(records: list[dict]) -> dict:
+def build_discovery_context(records: list[dict]) -> dict:
+    discovery_records = [record for record in records if record["date"] in DISCOVERY_DATES]
     totals = Counter()
-    for record in records:
+    for record in discovery_records:
         totals.update(record["counts"])
+
     categories = sorted(totals)
     top_categories = [category for category, _ in totals.most_common(12)]
+    places = sorted(LOCATIONS)
+    discovery = {}
+    for category in categories:
+        discovery[category] = {}
+        for place in places:
+            aggregate_value = aggregate(discovery_records, category=category, places=[place])
+            discovery[category][place] = {
+                "count": aggregate_value.count,
+                "total": aggregate_value.total,
+                "share": aggregate_value.share,
+            }
+
     return {
-        "places": sorted(LOCATIONS),
-        "dates": DATES[:],
+        "places": places,
+        "discovery_months": DISCOVERY_DATES[:],
         "categories": categories,
         "top_categories": top_categories,
+        "discovery": discovery,
     }
 
 
-def score_hypothesis(hypothesis: dict, records: list[dict]) -> ScoredHypothesis:
-    kind = hypothesis.get("kind")
-    if kind == "category_share":
-        return score_category_share(hypothesis, records)
-    if kind == "recent_shift":
-        return score_recent_shift(hypothesis, records)
-    raise ValueError(f"unsupported kind: {kind}")
+def score_claim(claim: dict, records: list[dict], months: list[str]) -> PairScore:
+    kind = claim.get("kind", "pair_share")
+    if kind != "pair_share":
+        raise ValueError(f"unsupported kind: {kind}")
 
-
-def score_category_share(hypothesis: dict, records: list[dict]) -> ScoredHypothesis:
-    name = required(hypothesis, "name")
-    category = required(hypothesis, "category")
-    place = required(hypothesis, "place")
-    reference = hypothesis.get("reference", "all_other")
-    months = hypothesis.get("months")
+    name = required(claim, "name")
+    category = required(claim, "category")
+    place = required(claim, "place")
+    reference = required(claim, "reference")
 
     a = aggregate(records, category=category, places=[place], months=months)
     if reference == "all_other":
@@ -197,31 +226,7 @@ def score_category_share(hypothesis: dict, records: list[dict]) -> ScoredHypothe
         b_label=b_label,
         a=a,
         b=b,
-        direction=hypothesis.get("direction", "different"),
-    )
-
-
-def score_recent_shift(hypothesis: dict, records: list[dict]) -> ScoredHypothesis:
-    name = required(hypothesis, "name")
-    category = required(hypothesis, "category")
-    place = required(hypothesis, "place")
-    recent_count = int(hypothesis.get("recent_months", 2))
-    if recent_count <= 0 or recent_count >= len(DATES):
-        raise ValueError("recent_months must be between 1 and len(DATES) - 1")
-
-    earlier_months = DATES[:-recent_count]
-    recent_months = DATES[-recent_count:]
-    a = aggregate(records, category=category, places=[place], months=recent_months)
-    b = aggregate(records, category=category, places=[place], months=earlier_months)
-
-    return score_two_proportions(
-        name=name,
-        category=category,
-        a_label=f"{place}_recent",
-        b_label=f"{place}_earlier",
-        a=a,
-        b=b,
-        direction=hypothesis.get("direction", "different"),
+        direction=claim.get("direction", "higher"),
     )
 
 
@@ -260,7 +265,7 @@ def score_two_proportions(
     a: Aggregate,
     b: Aggregate,
     direction: str,
-) -> ScoredHypothesis:
+) -> PairScore:
     if a.total <= 0 or b.total <= 0:
         raise ValueError("empty comparison group")
 
@@ -281,9 +286,8 @@ def score_two_proportions(
     else:
         score = 0.0
 
-    return ScoredHypothesis(
+    return PairScore(
         name=name,
-        score=score,
         category=category,
         a_label=a_label,
         b_label=b_label,
@@ -293,13 +297,14 @@ def score_two_proportions(
         z_score=z_score,
         p_value=p_value,
         effect_size=effect_size,
+        score=score,
     )
 
 
-def required(hypothesis: dict, key: str) -> str:
-    value = hypothesis.get(key)
+def required(claim: dict, key: str) -> str:
+    value = claim.get(key)
     if not value:
-        raise ValueError(f"hypothesis missing {key}")
+        raise ValueError(f"claim missing {key}")
     return str(value)
 
 

@@ -1,74 +1,77 @@
-"""Mutable candidate hypothesis generator.
+"""Mutable discovery strategy for the North Yorkshire crime example.
 
-The fixed evaluator imports this file and calls hypotheses(context). Edit this
-file only; do not edit problem.md or evaluate.py while running the loop.
+The fixed evaluator passes only Jan-Feb aggregate summaries into claim(context).
+This file must select one claim that should survive a March hold-out check.
 """
 
+import math
 
-def hypotheses(context):
-    """Return candidate hypotheses to score.
 
-    Available context keys:
-    - places: sampled place names
-    - dates: sampled YYYY-MM months
-    - categories: crime categories present in the cached data
-    - top_categories: most frequent crime categories in the cached data
-    """
+MIN_PRIMARY_COUNT = 10
+MIN_REFERENCE_COUNT = 1
 
-    hypotheses = []
 
-    places = context["places"]
-    categories = context["top_categories"]
+def claim(context):
+    """Return one claim selected from discovery-month evidence only."""
 
-    for place in places:
-        other_places = [other for other in places if other != place]
+    best = None
+    for category in context["categories"]:
+        for place in context["places"]:
+            a = context["discovery"][category][place]
+            if a["count"] < MIN_PRIMARY_COUNT:
+                continue
 
-        for category in categories:
-            hypotheses.append(
-                {
-                    "name": f"{place} {category} share vs other sampled north yorkshire towns",
-                    "kind": "category_share",
+            for reference in context["places"]:
+                if reference == place:
+                    continue
+
+                b = context["discovery"][category][reference]
+                if b["count"] < MIN_REFERENCE_COUNT:
+                    continue
+
+                score = discovery_score(a, b)
+                if score <= 0:
+                    continue
+
+                candidate = {
+                    "name": f"{place} {category} share is higher than {reference}",
+                    "kind": "pair_share",
                     "category": category,
                     "place": place,
-                    "reference": "all_other",
+                    "reference": reference,
                     "direction": "higher",
+                    "rationale": (
+                        "Discovery months show "
+                        f"{a['count']}/{a['total']} vs {b['count']}/{b['total']} "
+                        f"records, a {safe_lift(a, b):.1f}x lift."
+                    ),
+                    "_discovery_score": score,
                 }
-            )
+                if best is None or score > best["_discovery_score"]:
+                    best = candidate
 
-            for reference in other_places:
-                hypotheses.append(
-                    {
-                        "name": f"{place} {category} share vs {reference}",
-                        "kind": "category_share",
-                        "category": category,
-                        "place": place,
-                        "reference": reference,
-                        "direction": "higher",
-                    }
-                )
+    if best is None:
+        raise RuntimeError("No claim met the candidate strategy thresholds.")
 
-            for month in context["dates"]:
-                hypotheses.append(
-                    {
-                        "name": f"{place} {category} share during {month} vs other sampled towns",
-                        "kind": "category_share",
-                        "category": category,
-                        "place": place,
-                        "reference": "all_other",
-                        "months": [month],
-                        "direction": "higher",
-                    }
-                )
+    return {key: value for key, value in best.items() if not key.startswith("_")}
 
-            hypotheses.append(
-                {
-                    "name": f"{place} {category} recent one-month shift",
-                    "kind": "recent_shift",
-                    "category": category,
-                    "place": place,
-                    "recent_months": 1,
-                    "direction": "higher",
-                }
-            )
 
-    return hypotheses
+def discovery_score(a, b):
+    """Rank pairwise share gaps using significance and lift."""
+
+    if a["total"] <= 0 or b["total"] <= 0:
+        return 0.0
+
+    effect_size = a["share"] - b["share"]
+    if effect_size <= 0:
+        return 0.0
+
+    pooled = (a["count"] + b["count"]) / (a["total"] + b["total"])
+    standard_error = math.sqrt(pooled * (1 - pooled) * (1 / a["total"] + 1 / b["total"]))
+    z_score = effect_size / standard_error if standard_error else 0.0
+    lift = safe_lift(a, b)
+    return abs(z_score) * math.log1p(abs(math.log(lift)))
+
+
+def safe_lift(a, b):
+    return (a["share"] + 1e-12) / (b["share"] + 1e-12)

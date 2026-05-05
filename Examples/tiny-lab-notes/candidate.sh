@@ -1,7 +1,7 @@
 # Mutable candidate for the Tiny Lab Notes smoke problem.
-# This starts intentionally conservative so a simple learning-rate edit can improve it.
+# The evaluator compares this candidate against an immutable weak baseline.
 
-LEARNING_RATE=0.0001
+LEARNING_RATE=0.001
 WEIGHT_DECAY=0.0
 
 MAX_SEQ_LEN=128

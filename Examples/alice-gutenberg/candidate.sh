@@ -1,5 +1,5 @@
 # Mutable candidate for the Alice Gutenberg problem.
-# The fixed evaluator owns data prep, time budget, evaluation, and result logging.
+# The evaluator compares this candidate against an immutable weak baseline.
 
 LEARNING_RATE=0.0003
 WEIGHT_DECAY=0.0

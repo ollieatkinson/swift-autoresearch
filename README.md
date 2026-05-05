@@ -18,8 +18,8 @@ swift run autoresearch evaluate \
 ```
 
 That command downloads a small public-domain Project Gutenberg text on first
-run, prepares it, trains the MLX backend for a fixed budget, parses `val_bpb`,
-and appends one row to the example `results.tsv`.
+run, prepares it, trains a fixed MLX baseline and the mutable candidate, parses
+`improvement_bpb`, and appends one row to the example `results.tsv`.
 
 `prepare` still exists as a lower-level command. It requires an explicit UTF-8
 text file or directory of `.txt` files.
@@ -104,29 +104,32 @@ times out, or does not print the metric.
 
 ## Reading Output
 
-For MLX training examples, `val_bpb` is the optimization metric and lower is
-better. It is validation bits per byte, so it measures how well the model
-predicts held-out bytes after the fixed wall-clock training budget. Use it to
-decide whether a candidate should be kept.
+For MLX training examples, `val_bpb` is validation bits per byte and lower is
+better. The examples make the improvement explicit by running an immutable weak
+baseline and the mutable candidate on the same data, then printing
+`improvement_bpb = baseline_val_bpb - candidate_val_bpb`. Positive
+`improvement_bpb` means the candidate predicts held-out bytes better than the
+fixed baseline.
 
 The live training lines are diagnostic. `loss` shows current training loss,
 `tok/sec` shows throughput, `dt` shows step time, `epoch` shows data progress,
 and `remaining` shows the wall-clock budget left. The final summary fields such
 as `num_steps`, `total_tokens_M`, `training_seconds`, and `peak_vram_mb` explain
 what fit inside the budget. They are useful for understanding why a candidate
-won or lost, but `val_bpb` is the metric used by the loop.
+won or lost, but `improvement_bpb` is the metric used by the example loop.
 
 For generic problem examples, the final parsed metric and `status` are the
 important loop output. The run log keeps the evaluator's full stdout and stderr.
-For the North Yorkshire example, `score` is maximized, `best_hypothesis` names
-the strongest generated claim, `a` and `b` are the two compared groups, counts
-and shares show the observed proportions, and `z_score`, `p_value`, `lift`, and
-`effect_size` explain the signal behind the score.
+For the North Yorkshire example, `score` is maximized. The candidate sees only
+Jan-Feb discovery summaries and returns one claim. The evaluator scores that
+claim on March hold-out data and prints discovery/hold-out counts, shares,
+`z_score`, `p_value`, `lift`, and `effect_size`. The smoking gun is a claim that
+was found in discovery and still holds in the held-out month.
 
 ## Examples
 
 The examples are intentionally separate. Each problem owns its own immutable
-`problem.md`, fixed `evaluate.sh`, mutable `candidate.sh`, cache directory, and
+`problem.md`, fixed `evaluate.sh`, mutable candidate file, cache directory, and
 `results.tsv`. The examples do not mutate the package implementation; the agent
 mutates only example-local candidate files.
 
@@ -141,7 +144,8 @@ The only mutable file is
 [Examples/alice-gutenberg/candidate.sh](Examples/alice-gutenberg/candidate.sh).
 It is intentionally small: the agent can change MLX model size, batch size,
 sequence length, learning rate, and weight decay without touching the
-`autoresearch` package source.
+`autoresearch` package source. The evaluator prints `baseline_val_bpb`,
+`candidate_val_bpb`, and `improvement_bpb` so it is obvious what got better.
 
 1. Read the immutable problem contract:
 
@@ -149,7 +153,7 @@ sequence length, learning rate, and weight decay without touching the
    sed -n '1,120p' Examples/alice-gutenberg/problem.md
    ```
 
-2. Run the baseline evaluation:
+2. Run one evaluation:
 
    ```bash
    swift run autoresearch evaluate \
@@ -174,11 +178,12 @@ sequence length, learning rate, and weight decay without touching the
      --description "short experiment description"
    ```
 
-   A `keep` row means the candidate beat the previous best metric. A `discard`
-   row means the candidate ran but did not improve. A `crash` row means the
-   evaluator failed, timed out, or did not print `val_bpb`.
+   A `keep` row means the candidate beat the previous best improvement. A
+   `discard` row means the candidate ran but did not improve. A `crash` row
+   means the evaluator failed, timed out, or did not print `improvement_bpb`.
 
-The evaluator performs the concrete MLX run:
+The candidate portion of the evaluator performs this MLX run after the fixed
+baseline run:
 
 ```bash
 source Examples/alice-gutenberg/candidate.sh
@@ -211,17 +216,17 @@ swift run autoresearch evaluate \
 
 It is useful for checking the loop quickly, but it is too small to be an
 interesting optimization target. Its mutable file is
-[Examples/tiny-lab-notes/candidate.sh](Examples/tiny-lab-notes/candidate.sh),
-which starts with a deliberately conservative learning rate so an improvement
-is easy to demonstrate. A first candidate edit is changing
-`LEARNING_RATE=0.0001` to `LEARNING_RATE=0.001`.
+[Examples/tiny-lab-notes/candidate.sh](Examples/tiny-lab-notes/candidate.sh).
+The evaluator compares the candidate against an immutable weak MLX baseline and
+prints `improvement_bpb`, so the smoke test has the same "what got better"
+shape as the larger Alice example.
 
 ### North Yorkshire Crime Hypotheses
 
 This example is a self-contained open-data hypothesis search. It uses the
 Police.uk street-level crime API catalogued by data.gov.uk, caches a fixed slice
 of January-March 2024 data around York, Harrogate, Scarborough, and
-Northallerton, and scores hypotheses from a mutable local Python file:
+Northallerton, and validates one mutable discovery strategy:
 
 ```bash
 swift run autoresearch evaluate \
@@ -230,12 +235,12 @@ swift run autoresearch evaluate \
 ```
 
 Only [Examples/uk-crime-hypotheses/candidate.py](Examples/uk-crime-hypotheses/candidate.py)
-is mutable. The fixed evaluator owns the data download, aggregation, statistical
-test, and scoring. The checked-in candidate loops over
-`context["top_categories"]`, `context["places"]`, named town comparisons, and
-single-month slices. A useful candidate edit is to change that search strategy:
-add different category filters, compare lower shares as well as higher shares,
-or focus on recent-vs-earlier movement.
+is mutable. The fixed evaluator owns the data download, aggregation, hold-out
+split, statistical test, and scoring. The checked-in candidate sees Jan-Feb
+summaries, selects one claim, and the evaluator checks whether March supports
+it. A useful candidate edit is to change that selection strategy: add different
+category filters, adjust minimum counts, penalize tiny reference groups, or
+search lower shares as well as higher shares.
 
 ### Other Problem Shapes
 
@@ -244,7 +249,7 @@ strategy, data-cleaning rules, or model hyperparameters. Keep the same split:
 
 - `problem.md`: immutable goal, metric, direction, timeout, mutable paths.
 - `evaluate.sh`: fixed evaluator that prints `metric: value`.
-- `candidate.sh`: mutable candidate code/config the agent can edit.
+- candidate files: mutable code/config the agent can edit.
 - `results.tsv`: uncommitted experiment log.
 
 ## What Is Ported

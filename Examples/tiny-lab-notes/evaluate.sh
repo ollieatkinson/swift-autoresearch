@@ -19,12 +19,45 @@ source "$candidate"
 
 cd "$repo_dir"
 
-cache_dir=".build/tiny-lab-notes-cache"
+work_dir=".build/tiny-lab-notes"
+cache_dir="$work_dir/cache"
+baseline_log="$work_dir/baseline-training.log"
+candidate_log="$work_dir/candidate-training.log"
+
+mkdir -p "$work_dir"
 
 swift run autoresearch prepare \
   --input Examples/tiny-lab-notes/corpus.txt \
   --cache-dir "$cache_dir" >/dev/null
 
+extract_val_bpb() {
+  awk '/^val_bpb:/ { value = $2 } END { if (value != "") print value }' "$1"
+}
+
+echo "--- fixed baseline training ---"
+swift run autoresearch train \
+  --backend mlx \
+  --mlx-device gpu \
+  --cache-dir "$cache_dir" \
+  --time-budget 1 \
+  --max-seq-len 128 \
+  --device-batch-size 4 \
+  --total-batch-size 512 \
+  --eval-tokens 4096 \
+  --learning-rate 0.00001 \
+  --weight-decay 0.0 \
+  --mlx-layers 1 \
+  --mlx-dim 32 \
+  --mlx-heads 4 \
+  --mlx-mlp-dim 64 | tee "$baseline_log"
+
+baseline_val_bpb="$(extract_val_bpb "$baseline_log")"
+if [[ -z "$baseline_val_bpb" ]]; then
+  echo "Could not parse baseline val_bpb" >&2
+  exit 2
+fi
+
+echo "--- mutable candidate training ---"
 swift run autoresearch train \
   --backend mlx \
   --mlx-device gpu \
@@ -39,4 +72,27 @@ swift run autoresearch train \
   --mlx-layers "$MLX_LAYERS" \
   --mlx-dim "$MLX_DIM" \
   --mlx-heads "$MLX_HEADS" \
-  --mlx-mlp-dim "$MLX_MLP_DIM"
+  --mlx-mlp-dim "$MLX_MLP_DIM" | tee "$candidate_log"
+
+candidate_val_bpb="$(extract_val_bpb "$candidate_log")"
+if [[ -z "$candidate_val_bpb" ]]; then
+  echo "Could not parse candidate val_bpb" >&2
+  exit 2
+fi
+
+improvement_bpb="$(awk -v baseline="$baseline_val_bpb" -v candidate="$candidate_val_bpb" 'BEGIN { printf "%.6f", baseline - candidate }')"
+
+echo "---"
+echo "improvement_bpb: $improvement_bpb"
+echo "baseline_val_bpb: $baseline_val_bpb"
+echo "candidate_val_bpb: $candidate_val_bpb"
+echo "smoking_gun: candidate lowers validation bits per byte versus the fixed MLX baseline"
+echo "baseline_learning_rate: 0.00001"
+echo "candidate_learning_rate: $LEARNING_RATE"
+echo "candidate_max_seq_len: $MAX_SEQ_LEN"
+echo "candidate_device_batch_size: $DEVICE_BATCH_SIZE"
+echo "candidate_total_batch_size: $TOTAL_BATCH_SIZE"
+echo "candidate_mlx_layers: $MLX_LAYERS"
+echo "candidate_mlx_dim: $MLX_DIM"
+echo "candidate_mlx_heads: $MLX_HEADS"
+echo "candidate_mlx_mlp_dim: $MLX_MLP_DIM"
