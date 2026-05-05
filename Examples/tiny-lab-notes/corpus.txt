@@ -1,0 +1,31 @@
+Trial 001: baseline MLX run. The corpus is small, the tokenizer is byte-level, and validation bits per byte is the score.
+
+Trial 002: increase sequence length. Longer rows give the model more local context, but they also reduce the number of updates per second.
+
+Trial 003: lower the learning rate. The loss curve is quieter, and validation bits per byte changes more slowly.
+
+Trial 004: raise the learning rate. The model adapts quickly at first, then the validation score becomes unstable.
+
+Trial 005: increase the device batch size. Throughput improves when the machine can keep the batch in memory.
+
+Trial 006: reduce the device batch size. Each step is cheaper, but the optimizer sees noisier statistics.
+
+Trial 007: use the MLX backend on CPU. The transformer path exercises tensor code without using the Apple GPU.
+
+Trial 008: use the MLX backend on GPU. The Metal kernels make tensor training practical on Apple Silicon.
+
+Trial 009: add one transformer layer. The model has more capacity and should fit repeated lab-note structure better.
+
+Trial 010: shrink the hidden dimension. The model trains faster, but it may not capture enough structure.
+
+Trial 011: increase the hidden dimension. Validation bits per byte improves only if the time budget is long enough.
+
+Trial 012: keep the data split fixed. Comparing runs only makes sense when validation text and metric calculation stay stable.
+
+Trial 013: inspect the final summary. The useful fields are train time, step count, validation loss, and validation bits per byte.
+
+Trial 014: change one variable at a time. Small controlled edits make it easier to understand why a run improved.
+
+Trial 015: compare the best run against the baseline. Autoresearch should keep changes that lower validation bits per byte.
+
+Trial 016: record the command line. A reproducible run includes input path, cache path, backend, model size, and time budget.
