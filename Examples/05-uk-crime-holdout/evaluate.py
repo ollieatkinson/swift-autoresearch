@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixed evaluator for the North Yorkshire Crime Hypotheses example.
+"""Fixed evaluator for the UK Crime Holdout example.
 
 The mutable candidate sees only the discovery months. This evaluator then
 checks the selected claim on a held-out month.
@@ -31,7 +31,7 @@ LOCATIONS = {
 
 EXAMPLE_DIR = Path(__file__).resolve().parent
 REPO_DIR = EXAMPLE_DIR.parent.parent
-CACHE_DIR = REPO_DIR / ".build" / "uk-crime-hypotheses"
+CACHE_DIR = REPO_DIR / ".build" / "05-uk-crime-holdout"
 CANDIDATE_PATH = EXAMPLE_DIR / "candidate.py"
 
 
@@ -78,6 +78,7 @@ def main() -> int:
         return 2
 
     score = holdout.score if discovery.score > 0 and holdout.score > 0 else 0.0
+    baseline = random_claim_baseline(records, context, score)
 
     print("---")
     print(f"score: {score:.6f}")
@@ -112,6 +113,11 @@ def main() -> int:
     print(f"holdout_z_score: {holdout.z_score:.6f}")
     print(f"holdout_p_value: {holdout.p_value:.6g}")
     print(f"holdout_score: {holdout.score:.6f}")
+    print(f"random_claims: {baseline['count']}")
+    print(f"random_claim_mean_score: {baseline['mean']:.6f}")
+    print(f"random_claim_median_score: {baseline['median']:.6f}")
+    print(f"random_claim_p90_score: {baseline['p90']:.6f}")
+    print(f"candidate_random_percentile: {baseline['percentile']:.2f}")
     print(f"records_discovery_months: {len(DISCOVERY_DATES)}")
     print(f"records_holdout_months: {len(HOLDOUT_DATES)}")
     print(f"records_places: {len(LOCATIONS)}")
@@ -228,6 +234,72 @@ def score_claim(claim: dict, records: list[dict], months: list[str]) -> PairScor
         b=b,
         direction=claim.get("direction", "higher"),
     )
+
+
+def random_claim_baseline(records: list[dict], context: dict, candidate_score: float) -> dict:
+    """Score a uniform random choice among discovery-positive pair claims."""
+
+    scores = []
+    for claim in enumerate_pair_claims(context):
+        discovery = score_claim(claim, records, DISCOVERY_DATES)
+        if discovery.score <= 0:
+            continue
+
+        holdout = score_claim(claim, records, HOLDOUT_DATES)
+        scores.append(holdout.score if holdout.score > 0 else 0.0)
+
+    if not scores:
+        return {
+            "count": 0,
+            "mean": 0.0,
+            "median": 0.0,
+            "p90": 0.0,
+            "percentile": 0.0,
+        }
+
+    ordered = sorted(scores)
+    count = len(ordered)
+    mean = sum(ordered) / count
+    median = percentile(ordered, 0.5)
+    p90 = percentile(ordered, 0.9)
+    rank = sum(1 for score in ordered if score <= candidate_score)
+
+    return {
+        "count": count,
+        "mean": mean,
+        "median": median,
+        "p90": p90,
+        "percentile": 100.0 * rank / count,
+    }
+
+
+def enumerate_pair_claims(context: dict) -> list[dict]:
+    claims = []
+    places = context["places"]
+    for category in context["categories"]:
+        for place in places:
+            for reference in places:
+                if reference == place:
+                    continue
+                for direction in ["higher", "lower"]:
+                    claims.append(
+                        {
+                            "name": f"{place} {category} share is {direction} than {reference}",
+                            "kind": "pair_share",
+                            "category": category,
+                            "place": place,
+                            "reference": reference,
+                            "direction": direction,
+                        }
+                    )
+    return claims
+
+
+def percentile(ordered: list[float], fraction: float) -> float:
+    if not ordered:
+        return 0.0
+    index = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * fraction))))
+    return ordered[index]
 
 
 def aggregate(

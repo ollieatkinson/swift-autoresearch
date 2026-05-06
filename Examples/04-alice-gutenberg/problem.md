@@ -20,7 +20,7 @@ fixed contract. The agent may edit only `candidate.sh`, commit each candidate,
 run the evaluator, and keep or discard by `improvement_bpb`.
 
 The evaluator downloads the UTF-8 plain-text eBook from Project Gutenberg on
-first run and caches it under `.build/alice-gutenberg/`.
+first run and caches it under `.build/04-alice-gutenberg/`.
 
 `candidate.sh` is the mutable research surface. It controls MLX model size,
 batching, optimizer knobs, and sequence length. The evaluator first trains an
@@ -39,40 +39,40 @@ than the fixed baseline.
 
 ```bash
 swift run autoresearch evaluate \
-  --problem Examples/alice-gutenberg/problem.md \
+  --problem Examples/04-alice-gutenberg/problem.md \
   --description baseline
 ```
 
 ## Try A Candidate Edit
 
-Edit `Examples/alice-gutenberg/candidate.sh`, for example by increasing
+Edit `Examples/04-alice-gutenberg/candidate.sh`, for example by increasing
 `LEARNING_RATE` or changing `MLX_DIM` and `MLX_MLP_DIM`, then run:
 
 ```bash
 swift run autoresearch evaluate \
-  --problem Examples/alice-gutenberg/problem.md \
+  --problem Examples/04-alice-gutenberg/problem.md \
   --description "tune candidate knobs"
 ```
 
 ## Manual Data Prep
 
 ```bash
-mkdir -p .build/alice-gutenberg
+mkdir -p .build/04-alice-gutenberg
 curl -fsSL https://www.gutenberg.org/ebooks/11.txt.utf-8 \
-  -o .build/alice-gutenberg/alice.txt
+  -o .build/04-alice-gutenberg/alice.txt
 swift run autoresearch prepare \
-  --input .build/alice-gutenberg/alice.txt \
-  --cache-dir .build/alice-gutenberg/cache
+  --input .build/04-alice-gutenberg/alice.txt \
+  --cache-dir .build/04-alice-gutenberg/cache
 ```
 
 ## Manual MLX Training Run
 
 ```bash
-source Examples/alice-gutenberg/candidate.sh
+source Examples/04-alice-gutenberg/candidate.sh
 swift run autoresearch train \
   --backend mlx \
   --mlx-device gpu \
-  --cache-dir .build/alice-gutenberg/cache \
+  --cache-dir .build/04-alice-gutenberg/cache \
   --time-budget 5 \
   --max-seq-len "$MAX_SEQ_LEN" \
   --device-batch-size "$DEVICE_BATCH_SIZE" \

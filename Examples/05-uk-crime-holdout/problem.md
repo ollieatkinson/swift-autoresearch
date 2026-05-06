@@ -1,5 +1,5 @@
 ---
-name: north-yorkshire-crime-hypotheses
+name: uk-crime-holdout
 metric: score
 direction: maximize
 evaluator: bash evaluate.sh
@@ -9,7 +9,7 @@ mutable:
   - candidate.py
 ---
 
-# North Yorkshire Crime Hypotheses
+# UK Crime Holdout
 
 This example uses UK open data to test whether a mutable research strategy can
 find one claim that survives a held-out check.
@@ -17,7 +17,7 @@ find one claim that survives a held-out check.
 The data source is the Police.uk street-level crime API, which is catalogued by
 data.gov.uk. The evaluator fetches crimes near York, Harrogate, Scarborough,
 and Northallerton for January through March 2024, caches the JSON under
-`.build/uk-crime-hypotheses/`, and aggregates category counts.
+`.build/05-uk-crime-holdout/`, and aggregates category counts.
 
 The problem document and evaluator are the immutable contract. The agent may
 edit only `candidate.py`. The evaluator gives `candidate.py` Jan-Feb aggregate
@@ -31,11 +31,15 @@ validation: candidate saw Jan-Feb only; evaluator scored March only
 claim: york bicycle-theft share is higher than scarborough
 discovery_lift: ...
 holdout_lift: ...
+random_claim_median_score: ...
+candidate_random_percentile: ...
 score: ...
 ```
 
-That is more useful than enumerating every possible comparison because the
-mutable file is responsible for selecting a claim that generalizes.
+The candidate is not improving one fixed statement. It is improving a
+claim-selection strategy. The evaluator keeps the discovery data, holdout data,
+and scoring rule fixed, then reports whether the selected claim beats a
+deterministic random-claim baseline.
 
 Candidate claims can look like:
 
@@ -54,13 +58,13 @@ autoresearch-style loop over open data.
 
 ```bash
 swift run autoresearch evaluate \
-  --problem Examples/uk-crime-hypotheses/problem.md \
+  --problem Examples/05-uk-crime-holdout/problem.md \
   --description baseline
 ```
 
 ## Try A Candidate Edit
 
-Edit `Examples/uk-crime-hypotheses/candidate.py` to change the discovery
+Edit `Examples/05-uk-crime-holdout/candidate.py` to change the discovery
 strategy. For example:
 
 - compare another crime category
@@ -73,7 +77,7 @@ Then rerun:
 
 ```bash
 swift run autoresearch evaluate \
-  --problem Examples/uk-crime-hypotheses/problem.md \
+  --problem Examples/05-uk-crime-holdout/problem.md \
   --description "expand hypothesis search"
 ```
 

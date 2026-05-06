@@ -19,7 +19,7 @@ source "$candidate"
 
 cd "$repo_dir"
 
-work_dir=".build/alice-gutenberg"
+work_dir=".build/04-alice-gutenberg"
 corpus="$work_dir/alice.txt"
 cache_dir="$work_dir/cache"
 baseline_log="$work_dir/baseline-training.log"

@@ -215,9 +215,14 @@ commit	score	memory_gb	status	description
 
 ## Examples
 
-See [Examples/README.md](Examples/README.md) for runnable examples ordered from
-beginner to more complete language-model workflows. Each example is a normal
-problem directory with its own corpus, evaluator, mutable candidate, and metric.
+Each example directory has its own README, corpus or data source, evaluator,
+mutable candidate, and metric:
+
+- [01 Quick Bigram](Examples/01-quick-bigram/README.md)
+- [02 BPE Tokenizer Compression](Examples/02-bpe-tokenizer-compression/README.md)
+- [03 MLX BPE Smoke](Examples/03-mlx-bpe-smoke/README.md)
+- [04 Alice Gutenberg](Examples/04-alice-gutenberg/README.md)
+- [05 UK Crime Holdout](Examples/05-uk-crime-holdout/README.md)
 
 ## Output Fields
 
