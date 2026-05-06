@@ -70,19 +70,19 @@ milliseconds.
 
 ## Autoresearch Loop
 
-I ran this as a local autoresearch loop by letting the evaluator append to its
-ignored `results.tsv`:
+This table shows a local autoresearch-style loop. The operator ran the
+evaluator with numbered descriptions:
 
 ```bash
-rm -f Examples/06-swift-package-performance/results.tsv
 swift run autoresearch evaluate \
   --problem Examples/06-swift-package-performance/problem.md \
   --description "00 baseline string splitting"
 ```
 
-Then I edited `PackageUnderTest/Sources/BuildRunProbe/main.swift` between runs
-and repeated the same command with a new description. I did not commit the
-generated `results.tsv`; the rows below are copied here to show the loop.
+Between rows, the model edited
+`PackageUnderTest/Sources/BuildRunProbe/main.swift`; the evaluator appended the
+score after each run. The generated `results.tsv` is not committed; the rows
+below are copied here to show the loop.
 
 ```text
 commit   score     memory_gb  status   description

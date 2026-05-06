@@ -73,9 +73,10 @@ metric, and evaluator stable.
 
 ## Autoresearch Loop
 
-I ran this as a local loop by letting the evaluator append to its ignored
-`results.tsv`, editing `candidate.sh` between runs, and restoring the checked-in
-candidate afterward:
+This table shows a local autoresearch-style loop. The operator ran the
+evaluator with numbered descriptions. Between rows, the model edited
+`candidate.sh`; the evaluator appended each score to `results.tsv`; after the
+loop, the checked-in candidate was restored.
 
 ```text
 commit   improvement_bpb  memory_gb  status   description

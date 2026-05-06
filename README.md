@@ -225,6 +225,33 @@ mutable candidate, and metric:
 - [05 UK Crime Holdout](Examples/05-uk-crime-holdout/README.md)
 - [06 Swift Package Performance](Examples/06-swift-package-performance/README.md)
 
+Each example also includes an `EXAMPLE_PROMPT.md` file with a paste-ready prompt
+for Codex, Claude Code, or another coding agent.
+
+<details>
+<summary>Generic Agent Prompt</summary>
+
+Paste this into a coding agent from the repository root:
+
+```text
+Run an autoresearch loop for `<EXAMPLE_DIR>`.
+
+Read `<EXAMPLE_DIR>/README.md` and `<EXAMPLE_DIR>/problem.md`. Use the problem
+document as the contract for the metric, direction, evaluator, result log, and
+mutable files.
+
+Run the evaluator with numbered descriptions, for example:
+`swift run autoresearch evaluate --problem <EXAMPLE_DIR>/problem.md --description "01 first candidate"`
+
+Let the evaluator append result rows. Try a few candidate changes, keeping
+improvements and reverting regressions. Do not commit unless explicitly asked.
+
+When finished, report the new result rows, explain what changed between
+candidates, and state the final metric value.
+```
+
+</details>
+
 ## Output Fields
 
 For MLX and bigram training, lower `val_bpb` is better. Final summary fields

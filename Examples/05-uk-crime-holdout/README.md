@@ -75,11 +75,13 @@ claim-selection strategies. That distinction matters: this example tests
 whether a strategy can choose a claim from discovery data that scores well on
 held-out data and is still useful to interpret.
 
-These rows came from clearing the ignored `results.tsv`, editing
-`candidate.py` between runs, and restoring the checked-in final strategy after
-the loop. The generated `results.tsv` is not committed; the scored outcomes are
-copied here so the example has a stable walkthrough. The decision column is the
-example-design decision, not just the CLI's score comparison.
+These rows show a local autoresearch-style loop. The operator ran the
+evaluator with numbered descriptions. Between rows, the model edited
+`candidate.py`; the evaluator appended each score to `results.tsv`; after the
+loop, the checked-in final strategy was restored. The generated `results.tsv`
+is not committed; the scored outcomes are copied here so the example has a
+stable walkthrough. The decision column is the example-design decision, not
+just the CLI's score comparison.
 
 | cycle | decision | strategy | held-out score | selected claim |
 | --- | --- | --- | ---: | --- |
