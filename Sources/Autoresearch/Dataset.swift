@@ -141,7 +141,7 @@ public struct TokenBatch: Sendable {
 }
 
 public final class PackedBatchLoader {
-    private let tokenizer: ByteTokenizer
+    private let tokenizer: any LanguageTokenizer
     private let documents: [[Int]]
     private let batchSize: Int
     private let sequenceLength: Int
@@ -152,7 +152,7 @@ public final class PackedBatchLoader {
     private var documentBuffer: [[Int]] = []
 
     public init(
-        tokenizer: ByteTokenizer,
+        tokenizer: any LanguageTokenizer,
         documents: [String],
         batchSize: Int,
         sequenceLength: Int,
@@ -212,7 +212,7 @@ public final class PackedBatchLoader {
 
     private static func tokenize(
         documents: [String],
-        tokenizer: ByteTokenizer,
+        tokenizer: any LanguageTokenizer,
         sequenceLength: Int
     ) -> [[Int]] {
         documents.flatMap { document -> [[Int]] in

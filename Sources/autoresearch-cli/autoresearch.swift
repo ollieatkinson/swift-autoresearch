@@ -59,6 +59,12 @@ struct Train: ParsableCommand {
     @Option(name: .customLong("backend"), help: "Training backend: bigram or mlx.")
     var backend: Backend = .bigram
 
+    @Option(name: .customLong("tokenizer"), help: "Tokenizer: byte or bpe.")
+    var tokenizer: TokenizerArgument = .byte
+
+    @Option(name: .customLong("tokenizer-file"), help: "BPE tokenizer JSON artifact path.")
+    var tokenizerFile: String?
+
     @Option(name: .customLong("time-budget"), help: "Training time budget in seconds.")
     var timeBudget: Double = 300
 
@@ -92,6 +98,9 @@ struct Train: ParsableCommand {
     @Option(name: .customLong("mlx-mlp-dim"), help: "MLX transformer MLP dimension.")
     var mlxMLPDimension = 512
 
+    @Option(name: .customLong("mlx-window-pattern"), help: "MLX attention window pattern: L for full, S for half-window.")
+    var mlxWindowPattern = "L"
+
     @Option(name: .customLong("mlx-device"), help: "MLX device: cpu or gpu.")
     var mlxDevice: MLXDevice = .cpu
 
@@ -100,6 +109,8 @@ struct Train: ParsableCommand {
         let resolvedBackend = TrainingBackend(rawValue: backend.rawValue) ?? .bigram
         let config = TrainingConfig(
             backend: resolvedBackend,
+            tokenizer: TokenizerKind(rawValue: tokenizer.rawValue) ?? .byte,
+            tokenizerFile: tokenizerFile.map(expandedFileURL),
             sequenceLength: maxSequenceLength,
             timeBudget: timeBudget,
             evalTokens: evalTokens,
@@ -111,7 +122,8 @@ struct Train: ParsableCommand {
                 layerCount: mlxLayerCount,
                 modelDimension: mlxModelDimension,
                 headCount: mlxHeadCount,
-                mlpDimension: mlxMLPDimension
+                mlpDimension: mlxMLPDimension,
+                windowPattern: mlxWindowPattern
             ),
             mlxDevice: MLXDevicePreference(rawValue: mlxDevice.rawValue) ?? .cpu
         )
@@ -216,6 +228,11 @@ enum Backend: String, ExpressibleByArgument {
         case .mlx: 0.001
         }
     }
+}
+
+enum TokenizerArgument: String, ExpressibleByArgument {
+    case byte
+    case bpe
 }
 
 enum MLXDevice: String, ExpressibleByArgument {

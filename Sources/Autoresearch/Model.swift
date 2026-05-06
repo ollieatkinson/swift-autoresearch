@@ -112,7 +112,7 @@ public final class BigramLanguageModel {
         return total / Double(batch.inputs.count)
     }
 
-    public func lossSumAndBytes(on batch: TokenBatch, tokenizer: ByteTokenizer) -> (nats: Double, bytes: Int) {
+    public func lossSumAndBytes(on batch: TokenBatch, tokenizer: any LanguageTokenizer) -> (nats: Double, bytes: Int) {
         ensureLogProbabilities()
         var nats = 0.0
         var bytes = 0

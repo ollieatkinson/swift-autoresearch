@@ -10,25 +10,124 @@ import Darwin
 import Glibc
 #endif
 
+private func initializedLinear(
+    inputDimensions: Int,
+    outputDimensions: Int,
+    scale: Float,
+    zero: Bool = false
+) -> Linear {
+    let weight = zero
+        ? MLXArray.zeros([outputDimensions, inputDimensions])
+        : MLXRandom.uniform(-scale ..< scale, [outputDimensions, inputDimensions])
+    return Linear(weight: weight, bias: nil)
+}
+
+final class MLXCausalSelfAttention: Module {
+    let queryProjection: Linear
+    let keyProjection: Linear
+    let valueProjection: Linear
+    let outputProjection: Linear
+    let queryNorm: RMSNorm
+    let keyNorm: RMSNorm
+    let rope: RoPE
+    let headCount: Int
+    let headDimension: Int
+
+    init(modelDimension: Int, headCount: Int, scale: Float) {
+        precondition(modelDimension % headCount == 0)
+        self.headCount = headCount
+        self.headDimension = modelDimension / headCount
+        self.queryProjection = initializedLinear(
+            inputDimensions: modelDimension,
+            outputDimensions: modelDimension,
+            scale: scale
+        )
+        self.keyProjection = initializedLinear(
+            inputDimensions: modelDimension,
+            outputDimensions: modelDimension,
+            scale: scale
+        )
+        self.valueProjection = initializedLinear(
+            inputDimensions: modelDimension,
+            outputDimensions: modelDimension,
+            scale: scale
+        )
+        self.outputProjection = initializedLinear(
+            inputDimensions: modelDimension,
+            outputDimensions: modelDimension,
+            scale: scale,
+            zero: true
+        )
+        self.queryNorm = RMSNorm(dimensions: headDimension)
+        self.keyNorm = RMSNorm(dimensions: headDimension)
+        self.rope = RoPE(dimensions: headDimension, traditional: false, base: 10_000, scale: 1)
+        super.init()
+    }
+
+    func callAsFunction(_ x: MLXArray, mask: MLXArray) -> MLXArray {
+        let batchSize = x.dim(0)
+        let tokenCount = x.dim(1)
+
+        var queries = queryProjection(x)
+            .reshaped(batchSize, tokenCount, headCount, headDimension)
+            .transposed(0, 2, 1, 3)
+        var keys = keyProjection(x)
+            .reshaped(batchSize, tokenCount, headCount, headDimension)
+            .transposed(0, 2, 1, 3)
+        let values = valueProjection(x)
+            .reshaped(batchSize, tokenCount, headCount, headDimension)
+            .transposed(0, 2, 1, 3)
+
+        queries = queryNorm(rope(queries))
+        keys = keyNorm(rope(keys))
+
+        var output = MLXFast.scaledDotProductAttention(
+            queries: queries,
+            keys: keys,
+            values: values,
+            scale: sqrt(1 / Float(headDimension)),
+            mask: mask,
+            memoryEfficientThreshold: 2
+        )
+
+        output = output.transposed(0, 2, 1, 3).flattened(start: -2, end: -1)
+        return outputProjection(output)
+    }
+}
+
 final class MLXAutoresearchBlock: Module {
     let norm1: RMSNorm
-    let attention: MultiHeadAttention
+    let attention: MLXCausalSelfAttention
     let norm2: RMSNorm
     let mlpIn: Linear
     let mlpOut: Linear
 
     init(modelDimension: Int, headCount: Int, mlpDimension: Int) {
+        let scale = sqrt(3) * pow(Float(modelDimension), -0.5)
         self.norm1 = RMSNorm(dimensions: modelDimension)
-        self.attention = MultiHeadAttention(dimensions: modelDimension, numHeads: headCount)
+        self.attention = MLXCausalSelfAttention(
+            modelDimension: modelDimension,
+            headCount: headCount,
+            scale: scale
+        )
         self.norm2 = RMSNorm(dimensions: modelDimension)
-        self.mlpIn = Linear(modelDimension, mlpDimension, bias: false)
-        self.mlpOut = Linear(mlpDimension, modelDimension, bias: false)
+        self.mlpIn = initializedLinear(
+            inputDimensions: modelDimension,
+            outputDimensions: mlpDimension,
+            scale: scale
+        )
+        self.mlpOut = initializedLinear(
+            inputDimensions: mlpDimension,
+            outputDimensions: modelDimension,
+            scale: scale,
+            zero: true
+        )
         super.init()
     }
 
     func callAsFunction(_ x: MLXArray, mask: MLXArray) -> MLXArray {
         var y = norm1(x)
-        y = attention(y, keys: y, values: y, mask: mask)
+        y = attention(y, mask: mask)
         var x = x + y
 
         y = norm2(x)
@@ -42,7 +141,6 @@ final class MLXAutoresearchBlock: Module {
 
 final class MLXAutoresearchModel: Module {
     let tokenEmbedding: Embedding
-    let positionEmbedding: Embedding
     let blocks: [MLXAutoresearchBlock]
     let norm: RMSNorm
     let head: Linear
@@ -54,8 +152,9 @@ final class MLXAutoresearchModel: Module {
         self.vocabSize = vocabSize
         self.sequenceLength = sequenceLength
         self.config = config
-        self.tokenEmbedding = Embedding(embeddingCount: vocabSize, dimensions: config.modelDimension)
-        self.positionEmbedding = Embedding(embeddingCount: sequenceLength, dimensions: config.modelDimension)
+        self.tokenEmbedding = Embedding(
+            weight: MLXRandom.normal([vocabSize, config.modelDimension], scale: 1.0)
+        )
         self.blocks = (0..<config.layerCount).map { _ in
             MLXAutoresearchBlock(
                 modelDimension: config.modelDimension,
@@ -64,7 +163,10 @@ final class MLXAutoresearchModel: Module {
             )
         }
         self.norm = RMSNorm(dimensions: config.modelDimension)
-        self.head = Linear(config.modelDimension, vocabSize, bias: false)
+        self.head = Linear(
+            weight: MLXRandom.normal([vocabSize, config.modelDimension], scale: 0.001),
+            bias: nil
+        )
         super.init()
     }
 
@@ -78,15 +180,41 @@ final class MLXAutoresearchModel: Module {
         let tokenCount = tokens.dim(1)
         precondition(tokenCount <= sequenceLength)
 
-        let positions = MLXArray(0..<tokenCount).expandedDimensions(axis: 0)
-        var x = tokenEmbedding(tokens) + positionEmbedding(positions)
-        let mask = MultiHeadAttention.createAdditiveCausalMask(tokenCount, dtype: .float32)
+        var x = norm(tokenEmbedding(tokens))
 
-        for block in blocks {
+        for (index, block) in blocks.enumerated() {
+            let mask = attentionMask(
+                tokenCount: tokenCount,
+                windowSize: windowSize(forLayer: index, tokenCount: tokenCount)
+            )
             x = block(x, mask: mask)
         }
 
-        return head(norm(x))
+        let logits = head(norm(x)).asType(.float32)
+        let softcap: Float = 15
+        return softcap * tanh(logits / softcap)
+    }
+
+    private func windowSize(forLayer layerIndex: Int, tokenCount: Int) -> Int? {
+        let pattern = Array(config.windowPattern.uppercased())
+        let marker = pattern[layerIndex % pattern.count]
+        if marker == "S", layerIndex != config.layerCount - 1 {
+            return max(1, tokenCount / 2)
+        }
+        return nil
+    }
+
+    private func attentionMask(tokenCount: Int, windowSize: Int?) -> MLXArray {
+        let indices = MLXArray(0..<tokenCount)
+        let rows = expandedDimensions(indices, axis: 1)
+        let columns = expandedDimensions(indices, axis: 0)
+        var mask = (rows .< columns).asType(.float32)
+
+        if let windowSize {
+            mask = mask + ((rows - columns) .>= windowSize).asType(.float32)
+        }
+
+        return mask * -1e9
     }
 }
 
@@ -109,7 +237,7 @@ struct MLXAutoresearchTrainer {
         progressLog: (String) -> Void
     ) throws -> TrainingSummary {
         let totalStart = Date()
-        let tokenizer = ByteTokenizer()
+        let tokenizer = try config.makeTokenizer()
         let corpus = try TextCorpus.load(paths: paths)
 
         MLXRandom.seed(config.randomSeed)
@@ -127,12 +255,14 @@ struct MLXAutoresearchTrainer {
         )
 
         log("Vocab size: \(tokenizer.vocabSize)")
+        log("Tokenizer: \(tokenizer.name)")
         log(
-            "Model config: MLX causal transformer " +
+            "Model config: MLX GPT transformer " +
             "layers=\(config.mlxModel.layerCount) " +
             "dim=\(config.mlxModel.modelDimension) " +
             "heads=\(config.mlxModel.headCount) " +
             "mlp_dim=\(config.mlxModel.mlpDimension) " +
+            "window_pattern=\(config.mlxModel.windowPattern.uppercased()) " +
             "device=\(config.mlxDevice.rawValue)"
         )
         log("Parameter counts:")
@@ -245,7 +375,7 @@ struct MLXAutoresearchTrainer {
 
     private func evaluateBPB(
         model: MLXAutoresearchModel,
-        tokenizer: ByteTokenizer,
+        tokenizer: any LanguageTokenizer,
         documents: [String]
     ) throws -> Double {
         let validationLoader = try PackedBatchLoader(
@@ -256,6 +386,7 @@ struct MLXAutoresearchTrainer {
         )
 
         let steps = max(1, config.evalTokens / max(1, config.deviceBatchSize * config.sequenceLength))
+        let tokenByteLengths = MLXArray((0..<tokenizer.vocabSize).map { tokenizer.byteLength(of: $0) })
         var totalNats = 0.0
         var totalBytes = 0.0
 
@@ -266,10 +397,11 @@ struct MLXAutoresearchTrainer {
             let flatTargets = targets.reshaped(-1)
             let logits = model(inputs).reshaped(-1, tokenizer.vocabSize)
             let loss = crossEntropy(logits: logits, targets: flatTargets, reduction: .none)
-            let mask = (flatTargets .!= tokenizer.bosTokenID).asType(.float32)
+            let byteLengths = tokenByteLengths[flatTargets].asType(.float32)
+            let mask = (byteLengths .> 0).asType(.float32)
 
             totalNats += Double((loss * mask).sum().item(Float.self))
-            totalBytes += Double(mask.sum().item(Float.self))
+            totalBytes += Double(byteLengths.sum().item(Float.self))
         }
 
         guard totalBytes > 0 else {

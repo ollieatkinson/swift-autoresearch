@@ -38,6 +38,7 @@ public struct AutoresearchTrainer {
         let optimizer = AdamWOptimizer(parameterCount: model.parameterCount)
 
         log("Vocab size: \(tokenizer.vocabSize)")
+        log("Tokenizer: \(tokenizer.name)")
         log("Model config: byte-level bigram")
         log("Parameter counts:")
         log("  transition_logits       : \(model.parameterCount)")
@@ -158,7 +159,7 @@ public struct AutoresearchTrainer {
 
     public static func evaluateBPB(
         model: BigramLanguageModel,
-        tokenizer: ByteTokenizer,
+        tokenizer: any LanguageTokenizer,
         documents: [String],
         batchSize: Int,
         sequenceLength: Int,

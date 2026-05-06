@@ -52,6 +52,8 @@ public struct CachePaths: Sendable {
 
 public struct TrainingConfig: Sendable {
     public var backend: TrainingBackend
+    public var tokenizer: TokenizerKind
+    public var tokenizerFile: URL?
     public var sequenceLength: Int
     public var timeBudget: TimeInterval
     public var evalTokens: Int
@@ -69,6 +71,8 @@ public struct TrainingConfig: Sendable {
 
     public init(
         backend: TrainingBackend = .bigram,
+        tokenizer: TokenizerKind = .byte,
+        tokenizerFile: URL? = nil,
         sequenceLength: Int = 2048,
         timeBudget: TimeInterval = 300,
         evalTokens: Int = 40 * 524_288,
@@ -85,6 +89,8 @@ public struct TrainingConfig: Sendable {
         mlxDevice: MLXDevicePreference = .cpu
     ) {
         self.backend = backend
+        self.tokenizer = tokenizer
+        self.tokenizerFile = tokenizerFile
         self.sequenceLength = sequenceLength
         self.timeBudget = timeBudget
         self.evalTokens = evalTokens
@@ -102,6 +108,12 @@ public struct TrainingConfig: Sendable {
     }
 
     public func validate() throws {
+        if backend == .bigram, tokenizer != .byte {
+            throw AutoresearchError.invalidConfiguration("The bigram backend only supports the byte tokenizer.")
+        }
+        if tokenizer == .bpe, tokenizerFile == nil {
+            throw AutoresearchError.invalidConfiguration("--tokenizer-file is required when --tokenizer bpe is selected.")
+        }
         guard sequenceLength > 0 else {
             throw AutoresearchError.invalidConfiguration("sequenceLength must be greater than zero.")
         }
@@ -145,11 +157,28 @@ public struct TrainingConfig: Sendable {
         }
         try mlxModel.validate()
     }
+
+    public func makeTokenizer() throws -> any LanguageTokenizer {
+        switch tokenizer {
+        case .byte:
+            return ByteTokenizer()
+        case .bpe:
+            guard let tokenizerFile else {
+                throw AutoresearchError.invalidConfiguration("--tokenizer-file is required when --tokenizer bpe is selected.")
+            }
+            return try BPETokenizer(artifactURL: tokenizerFile)
+        }
+    }
 }
 
 public enum TrainingBackend: String, CaseIterable, Sendable {
     case bigram
     case mlx
+}
+
+public enum TokenizerKind: String, CaseIterable, Sendable {
+    case byte
+    case bpe
 }
 
 public enum MLXDevicePreference: String, CaseIterable, Sendable {
@@ -162,17 +191,20 @@ public struct MLXModelConfig: Sendable {
     public var modelDimension: Int
     public var headCount: Int
     public var mlpDimension: Int
+    public var windowPattern: String
 
     public init(
         layerCount: Int = 2,
         modelDimension: Int = 128,
         headCount: Int = 4,
-        mlpDimension: Int = 512
+        mlpDimension: Int = 512,
+        windowPattern: String = "L"
     ) {
         self.layerCount = layerCount
         self.modelDimension = modelDimension
         self.headCount = headCount
         self.mlpDimension = mlpDimension
+        self.windowPattern = windowPattern
     }
 
     public func validate() throws {
@@ -190,6 +222,10 @@ public struct MLXModelConfig: Sendable {
         }
         guard mlpDimension > 0 else {
             throw AutoresearchError.invalidConfiguration("MLX MLP dimension must be greater than zero.")
+        }
+        guard !windowPattern.isEmpty,
+              windowPattern.uppercased().allSatisfy({ $0 == "L" || $0 == "S" }) else {
+            throw AutoresearchError.invalidConfiguration("MLX window pattern must contain only L and S.")
         }
     }
 }
