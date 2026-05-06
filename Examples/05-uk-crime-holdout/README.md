@@ -44,6 +44,12 @@ The useful moment is the train/validation split applied to research claims:
 the candidate can search Jan-Feb, but it does not get to inspect March before
 choosing a claim.
 
+The selected crime claim is not the product. It is an observable output that
+shows whether a search strategy can find a pattern that still appears in unseen
+data. In a real analysis workflow, that is useful for ranking which anomalies
+deserve human attention, comparing competing discovery heuristics, and avoiding
+claims that only looked good because they were selected from one slice of data.
+
 ## Demonstrated Improvement
 
 The rows below are not the same statement getting better. They are different
@@ -89,7 +95,8 @@ percentile on this fixed split. That is the useful comparison: not that one
 statement was tuned, but that the selection rule found a better held-out claim
 than a random discovery-positive claim. In the final run, York's bicycle-theft
 share remained much higher than Scarborough's in March, with a holdout lift of
-about `20.85x`.
+about `20.85x`. That makes the output a good test fixture for the loop, not a
+standalone operational conclusion about York or Scarborough.
 
 This is not causal inference. It is a compact demonstration of the repo's
 research loop: generate a claim from discovery data, then score it on data the
