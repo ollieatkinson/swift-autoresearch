@@ -1,8 +1,8 @@
 # 05 UK Crime Holdout
 
 Non-language-model example. This uses the generic evaluator loop to test
-whether a mutable research strategy can find one claim that survives a held-out
-month of UK open crime data.
+whether a mutable research strategy can find an operationally useful crime
+pattern that survives a held-out month of UK open crime data.
 
 The evaluator fetches Police.uk street-level crime records near York,
 Harrogate, Scarborough, and Northallerton. `candidate.py` sees January and
@@ -44,59 +44,79 @@ The useful moment is the train/validation split applied to research claims:
 the candidate can search Jan-Feb, but it does not get to inspect March before
 choosing a claim.
 
-The selected crime claim is not the product. It is an observable output that
-shows whether a search strategy can find a pattern that still appears in unseen
-data. In a real analysis workflow, that is useful for ranking which anomalies
-deserve human attention, comparing competing discovery heuristics, and avoiding
-claims that only looked good because they were selected from one slice of data.
+The selected crime claim is not just trivia about two towns. The candidate now
+searches for a local crime category whose share is elevated against the pooled
+baseline from the other sampled places. That makes the output closer to an
+analyst triage signal: a category and area that may deserve coordinated focus
+because the pattern appears in discovery data and remains visible in the
+held-out month.
+
+For the checked-in strategy, a local run selected:
+
+```text
+claim: york bicycle-theft share is higher than the pooled other-place baseline
+discovery: 69/1391 York records vs 8/1594 pooled other-place records
+holdout:   28/768 York records vs 8/1059 pooled other-place records
+holdout_lift: 4.826172
+score: 4.148686
+candidate_random_percentile: 97.77
+```
+
+An analyst could use that as a prompt to coordinate bicycle-theft prevention
+and investigation around York: check local hotspots and time windows, compare
+with cycle-parking infrastructure, share the signal with council or transport
+partners, and verify whether reporting or sampling effects explain the lift.
+It is not causal inference and it is not a resourcing decision by itself.
 
 ## Demonstrated Improvement
 
 The rows below are not the same statement getting better. They are different
 claim-selection strategies. That distinction matters: this example tests
 whether a strategy can choose a claim from discovery data that scores well on
-held-out data.
+held-out data and is still useful to interpret.
 
 These rows came from clearing the ignored `results.tsv`, editing
 `candidate.py` between runs, and restoring the checked-in final strategy after
 the loop. The generated `results.tsv` is not committed; the scored outcomes are
-copied here so the example has a stable walkthrough.
+copied here so the example has a stable walkthrough. The decision column is the
+example-design decision, not just the CLI's score comparison.
 
 | cycle | decision | strategy | held-out score | selected claim |
 | --- | --- | --- | ---: | --- |
-| 0 | baseline | naive top-category comparison | `0.000000` | Harrogate violent-crime share higher than Northallerton |
-| 1 | kept | largest raw share gap | `1.203788` | Scarborough violent-crime share higher than York |
-| 2 | kept | drop broad categories plus z-score | `1.347001` | York shoplifting share higher than Northallerton |
-| 3 | discarded | pooled "all other" reference | `0.004368` | Northallerton burglary share higher than all other places |
-| 4 | discarded | rare-category lift chase | `0.000000` | Harrogate robbery share higher than York |
-| 5 | kept | pairwise significance plus lift | `6.027808` | York bicycle-theft share higher than Scarborough |
-| 6 | discarded | over-restricted top categories | `0.072565` | Northallerton burglary share higher than Scarborough |
+| 0 | baseline | naive named-place comparison | `0.000000` | Harrogate violent-crime share higher than Northallerton |
+| 1 | rejected | largest named-place raw gap | `1.203788` | Scarborough violent-crime share higher than York |
+| 2 | rejected | metric-only named-place significance plus lift | `6.027808` | York bicycle-theft share higher than Scarborough |
+| 3 | rejected | pooled baseline ranked by raw share gap | `0.557634` | Scarborough violent-crime share higher than pooled other places |
+| 4 | rejected | pooled baseline with over-strict reference support | `0.004368` | Northallerton burglary share higher than pooled other places |
+| 5 | rejected | pooled lower-than-baseline anomaly | `4.947198` | Scarborough bicycle-theft share lower than pooled other places |
+| 6 | kept | pooled higher-than-baseline operational signal | `4.148686` | York bicycle-theft share higher than pooled other places |
+
+The progression is the point. Cycles 1-2 increase score but still answer a weak
+question: which named town makes the contrast look largest? Cycle 3 pivots to a
+pooled baseline but raw share gap favors broad violent-crime patterns that are
+less specific. Cycle 4 shows a threshold mistake: a too-strict reference-count
+floor excludes the useful bicycle-theft signal. Cycle 5 scores well, but it
+finds a lower-than-baseline category, which is less useful for deciding what to
+focus on locally. Cycle 6 keeps the better operational question: which local
+crime category is elevated against the rest of the sampled area and remains
+elevated in March?
 
 What this gains over randomly choosing claims is a baseline. The evaluator also
-scores every discovery-positive pair claim as if one were chosen uniformly at
-random. A local run produced:
+scores every discovery-positive comparison claim as if one were chosen uniformly
+at random. A local run produced:
 
 ```text
-random_claims: 168
-random_claim_mean_score: 0.776322
+random_claims: 224
+random_claim_mean_score: 0.765315
 random_claim_median_score: 0.145096
 random_claim_p90_score: 2.336463
-candidate_random_percentile: 100.00
+candidate_random_percentile: 97.77
 ```
 
-The discarded rows are useful because they show where attractive discovery
-signals fail. The pooled "all other" strategy found a discovery lift of `2.35x`,
-but March fell to `1.04x`. The rare-category lift strategy found a `7.20x`
-robbery lift in discovery, but the direction did not survive March, so the
-held-out score became zero.
-
-The final strategy's `6.027808` score is above the random-claim 90th
-percentile on this fixed split. That is the useful comparison: not that one
-statement was tuned, but that the selection rule found a better held-out claim
-than a random discovery-positive claim. In the final run, York's bicycle-theft
-share remained much higher than Scarborough's in March, with a holdout lift of
-about `20.85x`. That makes the output a good test fixture for the loop, not a
-standalone operational conclusion about York or Scarborough.
+The final strategy's `4.148686` score is above the random-claim 90th percentile
+on this fixed split. That is the useful comparison: not that one statement was
+tuned, but that the selection rule found a better held-out claim than a random
+discovery-positive claim while avoiding the weakest-comparator problem.
 
 This is not causal inference. It is a compact demonstration of the repo's
 research loop: generate a claim from discovery data, then score it on data the

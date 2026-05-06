@@ -237,10 +237,10 @@ def score_claim(claim: dict, records: list[dict], months: list[str]) -> PairScor
 
 
 def random_claim_baseline(records: list[dict], context: dict, candidate_score: float) -> dict:
-    """Score a uniform random choice among discovery-positive pair claims."""
+    """Score a uniform random choice among discovery-positive comparison claims."""
 
     scores = []
-    for claim in enumerate_pair_claims(context):
+    for claim in enumerate_comparison_claims(context):
         discovery = score_claim(claim, records, DISCOVERY_DATES)
         if discovery.score <= 0:
             continue
@@ -273,12 +273,12 @@ def random_claim_baseline(records: list[dict], context: dict, candidate_score: f
     }
 
 
-def enumerate_pair_claims(context: dict) -> list[dict]:
+def enumerate_comparison_claims(context: dict) -> list[dict]:
     claims = []
     places = context["places"]
     for category in context["categories"]:
         for place in places:
-            for reference in places:
+            for reference in places + ["all_other"]:
                 if reference == place:
                     continue
                 for direction in ["higher", "lower"]:

@@ -28,7 +28,7 @@ The smoking-gun shape is:
 
 ```text
 validation: candidate saw Jan-Feb only; evaluator scored March only
-claim: york bicycle-theft share is higher than scarborough
+claim: york bicycle-theft share is higher than the pooled other-place baseline
 discovery_lift: ...
 holdout_lift: ...
 random_claim_median_score: ...
@@ -47,12 +47,14 @@ Candidate claims can look like:
   sampled North Yorkshire towns"
 - "anti-social behaviour is a larger share around Scarborough than the other
   sampled North Yorkshire towns"
-- "shoplifting rose in the most recent sampled month around Harrogate"
+- "shoplifting is a larger share around Harrogate than the pooled baseline from
+  the other sampled towns"
 
 The evaluator scores the held-out claim by a combined score using statistical
 significance and effect size. This is not causal inference, and the street-level
 locations are approximate, but it is enough to demonstrate a local
-autoresearch-style loop over open data.
+autoresearch-style loop over open data. The useful output is a triage signal
+for follow-up analysis, not a standalone operational decision.
 
 ## Run One Evaluation
 
@@ -72,6 +74,7 @@ strategy. For example:
 - penalize low reference counts
 - search lower shares as well as higher shares
 - use `context["top_categories"]` instead of all categories
+- compare named places only if that question is operationally meaningful
 
 Then rerun:
 
