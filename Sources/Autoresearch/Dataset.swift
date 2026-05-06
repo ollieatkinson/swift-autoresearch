@@ -42,7 +42,7 @@ public struct DatasetPreparer {
         )
     }
 
-    private static func loadDocuments(input: URL) throws -> [String] {
+    public static func loadDocuments(input: URL) throws -> [String] {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: input.path, isDirectory: &isDirectory) else {
             throw AutoresearchError.invalidConfiguration("Input path does not exist: \(input.path)")

@@ -209,7 +209,7 @@ public struct BPETokenizer: LanguageTokenizer {
     }
 }
 
-private struct BPEArtifact: Decodable {
+struct BPEArtifact: Codable {
     var version: Int
     var bosTokenID: Int
     var tokenBytes: [String]
@@ -225,7 +225,7 @@ private struct BPEArtifact: Decodable {
     }
 }
 
-private struct BPEMergeRank: Decodable {
+struct BPEMergeRank: Codable {
     var left: String
     var right: String
     var rank: Int

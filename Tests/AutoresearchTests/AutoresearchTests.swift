@@ -82,6 +82,32 @@ import Testing
     #expect(tokenizer.name == "bpe")
 }
 
+@Test func bpeTrainerWritesLoadableArtifact() throws {
+    let root = FileManager.default.temporaryDirectory
+        .appendingPathComponent("swift-autoresearch-trained-bpe-\(UUID().uuidString)", isDirectory: true)
+    defer {
+        try? FileManager.default.removeItem(at: root)
+    }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+    let output = root.appendingPathComponent("tokenizer.json")
+    let summary = try BPETokenizerTrainer().train(
+        documents: [
+            "the the the theatre",
+            "there there then",
+        ],
+        config: BPETrainingConfig(vocabSize: 264, minPairFrequency: 2, maxTrainingBytes: nil),
+        outputURL: output
+    )
+    let tokenizer = try BPETokenizer(artifactURL: output)
+
+    #expect(summary.vocabSize > BPETokenizerTrainer.baseVocabularySize)
+    #expect(summary.merges > 0)
+    #expect(summary.finalTokenCount < summary.initialTokenCount)
+    #expect(tokenizer.decode(tokenizer.encode("the theatre")) == "the theatre")
+    #expect(tokenizer.encode("the").count < ByteTokenizer().encode("the").count)
+}
+
 @Test func bigramUpdateImprovesBatchLoss() throws {
     let tokenizer = ByteTokenizer()
     let loader = try PackedBatchLoader(

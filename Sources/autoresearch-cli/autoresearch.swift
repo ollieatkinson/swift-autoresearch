@@ -7,7 +7,7 @@ struct AutoresearchCLI: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "autoresearch",
         abstract: "Run Swift-native autoresearch experiments.",
-        subcommands: [Prepare.self, Train.self, Evaluate.self],
+        subcommands: [Prepare.self, TrainTokenizer.self, Train.self, Evaluate.self],
         defaultSubcommand: Train.self
     )
 }
@@ -42,6 +42,62 @@ struct Prepare: ParsableCommand {
             print("train_bytes: \(summary.trainBytes)")
             print("validation_bytes: \(summary.validationBytes)")
             print("Done. Ready to train with `swift run autoresearch train`.")
+        } catch let error as AutoresearchError {
+            throw ValidationError(error.description)
+        }
+    }
+}
+
+struct TrainTokenizer: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "train-tokenizer",
+        abstract: "Train a Swift-native byte-level BPE tokenizer artifact."
+    )
+
+    @Option(help: "Required UTF-8 text file or directory of .txt files.")
+    var input: String
+
+    @Option(name: .customLong("output"), help: "Tokenizer artifact path. Defaults to tokenizer.json in the cache root.")
+    var output: String?
+
+    @Option(name: .customLong("cache-dir"), help: "Cache directory for the default output path.")
+    var cacheDirectory: String?
+
+    @Option(name: .customLong("vocab-size"), help: "Target tokenizer vocabulary size, including byte and BOS tokens.")
+    var vocabSize = 8_192
+
+    @Option(name: .customLong("min-pair-frequency"), help: "Stop when the best byte-pair frequency is below this value.")
+    var minPairFrequency = 2
+
+    @Option(name: .customLong("max-training-bytes"), help: "Maximum UTF-8 bytes sampled for tokenizer training.")
+    var maxTrainingBytes = 50_000_000
+
+    mutating func run() throws {
+        let outputURL = output.map(expandedFileURL)
+            ?? (cacheDirectory.map(expandedFileURL) ?? CachePaths.defaultRoot())
+                .appendingPathComponent("tokenizer.json")
+
+        do {
+            let documents = try DatasetPreparer.loadDocuments(input: expandedFileURL(input))
+            let summary = try BPETokenizerTrainer().train(
+                documents: documents,
+                config: BPETrainingConfig(
+                    vocabSize: vocabSize,
+                    minPairFrequency: minPairFrequency,
+                    maxTrainingBytes: maxTrainingBytes
+                ),
+                outputURL: outputURL
+            )
+
+            print("Tokenizer artifact: \(summary.outputURL.path)")
+            print("documents: \(summary.documents)")
+            print("training_bytes: \(summary.trainingBytes)")
+            print("vocab_size: \(summary.vocabSize)")
+            print("merges: \(summary.merges)")
+            print("initial_tokens: \(summary.initialTokenCount)")
+            print("final_tokens: \(summary.finalTokenCount)")
+            print("compression_ratio: \(String(format: "%.4f", summary.compressionRatio))")
+            print("Done. Ready to train with `swift run autoresearch train --backend mlx --tokenizer bpe --tokenizer-file \(summary.outputURL.path)`.")
         } catch let error as AutoresearchError {
             throw ValidationError(error.description)
         }

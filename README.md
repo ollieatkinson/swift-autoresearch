@@ -6,7 +6,7 @@ experiments on Apple hardware. It includes:
 - a generic evaluator loop for problem documents and TSV result logs
 - a dependency-light byte bigram backend for fast harness checks
 - an MLX-backed GPT-style language-model backend for native Swift tensor runs
-- byte and loadable BPE tokenizer support
+- byte tokenization plus native byte-level BPE training/loading
 
 The upstream project this tracks conceptually is
 <https://github.com/karpathy/autoresearch>. This repository is an Apple-native
@@ -24,7 +24,8 @@ Implemented:
 - byte-tokenized bigram backend
 - MLX GPT-style backend with RoPE, Q/K norm, fast causal attention, ReLU-squared
   MLP, RMSNorm, softcapped logits, AdamW, and optional attention window patterns
-- optional BPE tokenizer loading from a Swift-readable JSON artifact
+- native byte-level BPE tokenizer training and loading from a Swift-readable
+  JSON artifact
 - generic problem evaluation and result logging
 
 Not implemented:
@@ -33,12 +34,11 @@ Not implemented:
 - CUDA FlashAttention
 - Muon optimizer
 - Parquet shard download/streaming
-- native Swift BPE training
 - exact numerical parity with upstream `train.py`
 
 For Apple hardware, the important missing parity items are Parquet data support,
-Muon, and native BPE training. CUDA-specific pieces are intentionally out of
-scope.
+Muon, and a tokenizer/data pipeline that exactly matches upstream. CUDA-specific
+pieces are intentionally out of scope.
 
 ## Requirements
 
@@ -139,7 +139,22 @@ The default tokenizer is byte-level:
 swift run autoresearch train --backend mlx --tokenizer byte
 ```
 
-BPE tokenization is available by loading a JSON artifact:
+Train a native byte-level BPE tokenizer artifact from text:
+
+```bash
+swift run autoresearch train-tokenizer \
+  --input corpus.txt \
+  --output tokenizer.json \
+  --vocab-size 8192
+```
+
+The trainer learns byte-pair merges directly from UTF-8 bytes. It is native
+Swift and deterministic, and it is designed to produce artifacts for this
+repo's MLX backend. It is not a `rustbpe`/`tiktoken` parity trainer: it does
+not implement GPT-style regex pre-tokenization or tiktoken's serialization
+format.
+
+BPE tokenization is then available by loading that artifact:
 
 ```bash
 swift run autoresearch train \
@@ -148,8 +163,7 @@ swift run autoresearch train \
   --tokenizer-file tokenizer.json
 ```
 
-The bigram backend is byte-only. BPE is currently runtime-only: this package
-does not train BPE vocabularies.
+The bigram backend is byte-only.
 
 ### BPE Artifact Format
 
@@ -261,6 +275,7 @@ problem document.
 ```bash
 swift test
 swift run autoresearch prepare --help
+swift run autoresearch train-tokenizer --help
 swift run autoresearch train --help
 swift run autoresearch evaluate --help
 ```
