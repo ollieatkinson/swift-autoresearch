@@ -34,6 +34,26 @@ The useful moment is seeing the harness work without MLX: `candidate.sh` is the
 only mutable file, but the evaluator prepares data, trains, parses the summary,
 and produces a comparable score.
 
+## Demonstrated Local Run
+
+A local run produced:
+
+```text
+val_bpb: 5.252667
+training_backend: bigram
+tokenizer: byte
+time_budget: 1
+learning_rate: 0.25
+```
+
+This is not trying to be a strong language model. The useful result is that the
+whole fixed-budget loop works in a few seconds with no MLX dependency: prepare
+data, train, evaluate held-out bytes, parse a metric, and return a score.
+
+That makes this the right first example when changing the evaluator or result
+logging. If this example fails, the issue is probably in the harness contract,
+not in GPU kernels or model architecture.
+
 ## Try Next
 
 Change `LEARNING_RATE` or `TIME_BUDGET` in `candidate.sh`, rerun the evaluator,

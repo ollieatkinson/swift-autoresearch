@@ -30,6 +30,8 @@ immutable weak baseline, then trains the candidate on the same data and reports:
 baseline_val_bpb: ...
 candidate_val_bpb: ...
 improvement_bpb: ...
+improvement_percent: ...
+estimated_eval_bits_saved: ...
 ```
 
 Positive `improvement_bpb` means the candidate predicts held-out bytes better
@@ -40,8 +42,25 @@ than the fixed baseline.
 ```bash
 swift run autoresearch evaluate \
   --problem Examples/04-alice-gutenberg/problem.md \
-  --description baseline
+  --description local-smoke \
+  --no-results \
+  --log-file .build/example-logs/04-alice-gutenberg.log
 ```
+
+Remove `--no-results` when you want to append a scored row to `results.tsv`.
+
+## Use The Output
+
+The evaluator trains the fixed weak baseline and the mutable candidate under
+the same five-second budget. Use `improvement_bpb` as the score:
+
+```text
+improvement_bpb = baseline_val_bpb - candidate_val_bpb
+```
+
+Higher is better. A positive value means the candidate predicted the held-out
+Alice bytes better than the baseline. `estimated_eval_bits_saved` translates
+that BPB reduction into the 4096-byte eval window used by this example.
 
 ## Try A Candidate Edit
 

@@ -86,12 +86,20 @@ if [[ -z "$candidate_val_bpb" ]]; then
 fi
 
 improvement_bpb="$(awk -v baseline="$baseline_val_bpb" -v candidate="$candidate_val_bpb" 'BEGIN { printf "%.6f", baseline - candidate }')"
+improvement_percent="$(awk -v baseline="$baseline_val_bpb" -v candidate="$candidate_val_bpb" 'BEGIN { printf "%.2f", 100.0 * (baseline - candidate) / baseline }')"
+estimated_eval_bits_saved="$(awk -v improvement="$improvement_bpb" 'BEGIN { printf "%.1f", improvement * 4096 }')"
 
 echo "---"
 echo "improvement_bpb: $improvement_bpb"
+echo "improvement_percent: $improvement_percent"
+echo "estimated_eval_bits_saved: $estimated_eval_bits_saved"
 echo "baseline_val_bpb: $baseline_val_bpb"
 echo "candidate_val_bpb: $candidate_val_bpb"
 echo "smoking_gun: candidate lowers validation bits per byte versus the fixed MLX baseline"
+echo "training_backend: mlx"
+echo "tokenizer: byte"
+echo "eval_tokens: 4096"
+echo "time_budget: 5"
 echo "baseline_learning_rate: 0.00005"
 echo "candidate_learning_rate: $LEARNING_RATE"
 echo "candidate_max_seq_len: $MAX_SEQ_LEN"

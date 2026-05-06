@@ -36,6 +36,28 @@ On the checked-in corpus, a local CPU smoke run compressed the text to about
 score through the BPE runtime. The useful moment is that the tokenizer is not a
 dead artifact; it changes the token stream the model trains on.
 
+## Demonstrated Local Run
+
+A local CPU run produced:
+
+```text
+tokenizer_compression_ratio: 0.2799
+tokenizer_vocab_size: 320
+tokenizer_merges: 63
+val_bpb: 1.956344
+training_backend: mlx
+tokenizer: bpe
+```
+
+This is the first example where the tokenizer artifact and model backend meet.
+The useful result is not the absolute `val_bpb` from a tiny one-second model;
+it is that the artifact trained in Swift is loaded by the BPE runtime and used
+by the MLX training path.
+
+If the tokenizer compression looks good but this example fails, the likely
+problem is in artifact loading, token packing, or the MLX backend. If this
+passes, the basic native Swift text-to-BPE-to-MLX path is alive.
+
 ## Try Next
 
 On Apple Silicon, change `MLX_DEVICE=gpu` in `candidate.sh`. Then try changing
