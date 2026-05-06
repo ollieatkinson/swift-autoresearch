@@ -57,24 +57,18 @@ xcodebuild -downloadComponent MetalToolchain
 
 ## Quick Start
 
-Run the small checked-in smoke example:
+Run the smallest checked-in smoke example:
 
 ```bash
 swift run autoresearch evaluate \
-  --problem Examples/tiny-lab-notes/problem.md \
-  --description baseline
+  --problem Examples/01-quick-bigram/problem.md \
+  --description local-smoke \
+  --no-results \
+  --log-file .build/example-logs/01-quick-bigram.log
 ```
 
-Run the Project Gutenberg example:
-
-```bash
-swift run autoresearch evaluate \
-  --problem Examples/alice-gutenberg/problem.md \
-  --description baseline
-```
-
-The evaluator prints the parsed metric and appends a row to the example
-`results.tsv`.
+The evaluator prints the parsed metric. Remove `--no-results` when you want to
+append a scored row to the example `results.tsv`.
 
 ## Data Preparation
 
@@ -221,37 +215,9 @@ commit	score	memory_gb	status	description
 
 ## Examples
 
-### Tiny Lab Notes
-
-A no-network smoke test with a tiny checked-in corpus:
-
-```bash
-swift run autoresearch evaluate \
-  --problem Examples/tiny-lab-notes/problem.md \
-  --description baseline
-```
-
-### Alice Gutenberg
-
-A public-domain text example based on Project Gutenberg eBook #11,
-`Alice's Adventures in Wonderland`:
-
-```bash
-swift run autoresearch evaluate \
-  --problem Examples/alice-gutenberg/problem.md \
-  --description baseline
-```
-
-### North Yorkshire Crime Hypotheses
-
-A non-language-model example that scores one discovery claim against held-out
-Police.uk crime data:
-
-```bash
-swift run autoresearch evaluate \
-  --problem Examples/uk-crime-hypotheses/problem.md \
-  --description baseline
-```
+See [Examples/README.md](Examples/README.md) for runnable examples ordered from
+beginner to more complete language-model workflows. Each example is a normal
+problem directory with its own corpus, evaluator, mutable candidate, and metric.
 
 ## Output Fields
 

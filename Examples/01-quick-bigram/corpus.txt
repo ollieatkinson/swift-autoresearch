@@ -1,0 +1,23 @@
+trial 001 sensor alpha stable pressure low coolant nominal
+trial 002 sensor alpha stable pressure low coolant nominal
+trial 003 sensor alpha stable pressure low coolant nominal
+
+trial 004 sensor beta warm pressure medium coolant nominal
+trial 005 sensor beta warm pressure medium coolant nominal
+trial 006 sensor beta warm pressure medium coolant nominal
+
+trial 007 sensor gamma hot pressure high coolant alert
+trial 008 sensor gamma hot pressure high coolant alert
+trial 009 sensor gamma hot pressure high coolant alert
+
+operator note alpha stable result accepted
+operator note beta warm result review
+operator note gamma hot result paused
+
+calibration alpha alpha alpha stable stable nominal
+calibration beta beta beta warm warm nominal
+calibration gamma gamma gamma hot hot alert
+
+validation sample alpha stable pressure low coolant nominal
+validation sample beta warm pressure medium coolant nominal
+validation sample gamma hot pressure high coolant alert

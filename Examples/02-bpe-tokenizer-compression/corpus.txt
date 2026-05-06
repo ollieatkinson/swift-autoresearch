@@ -1,0 +1,19 @@
+alpha report: sodium chloride sodium chloride sodium chloride dissolved cleanly
+alpha report: sodium chloride sodium chloride sodium chloride dissolved cleanly
+alpha report: sodium chloride sodium chloride sodium chloride dissolved cleanly
+
+beta report: lithium carbonate lithium carbonate lithium carbonate formed slowly
+beta report: lithium carbonate lithium carbonate lithium carbonate formed slowly
+beta report: lithium carbonate lithium carbonate lithium carbonate formed slowly
+
+gamma report: acetate buffer acetate buffer acetate buffer stayed stable
+gamma report: acetate buffer acetate buffer acetate buffer stayed stable
+gamma report: acetate buffer acetate buffer acetate buffer stayed stable
+
+control phrase: repeated laboratory tokens should collapse into longer pieces
+control phrase: repeated laboratory tokens should collapse into longer pieces
+control phrase: repeated laboratory tokens should collapse into longer pieces
+
+holdout phrase: sodium chloride buffer report remained readable
+holdout phrase: lithium carbonate report remained readable
+holdout phrase: acetate buffer report remained readable

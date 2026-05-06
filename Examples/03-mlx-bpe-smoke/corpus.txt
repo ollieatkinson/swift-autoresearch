@@ -1,0 +1,19 @@
+route alpha report: station north signal green platform clear
+route alpha report: station north signal green platform clear
+route alpha report: station north signal green platform clear
+
+route beta report: station central signal amber platform waiting
+route beta report: station central signal amber platform waiting
+route beta report: station central signal amber platform waiting
+
+route gamma report: station south signal red platform held
+route gamma report: station south signal red platform held
+route gamma report: station south signal red platform held
+
+dispatch note: green signals clear the route and trains depart
+dispatch note: amber signals hold the route and trains wait
+dispatch note: red signals close the route and trains stop
+
+validation route alpha signal green platform clear
+validation route beta signal amber platform waiting
+validation route gamma signal red platform held
