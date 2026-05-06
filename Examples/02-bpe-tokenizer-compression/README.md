@@ -59,6 +59,25 @@ model. A tokenizer can overfit a tiny corpus or produce tokens that are less
 useful on different text. What it shows is the artifact-level behavior that a
 later MLX run can consume.
 
+## Autoresearch Loop
+
+I ran this as a local loop by letting the evaluator append to its ignored
+`results.tsv`, editing `candidate.sh` between runs, and restoring the checked-in
+candidate afterward:
+
+```text
+commit   token_reduction  memory_gb  status   description
+f654be6  0.670300         0.0        keep     00 baseline vocab 320
+f654be6  0.364000         0.0        discard  01 smaller vocab 280
+f654be6  0.852300         0.0        keep     02 larger vocab 384
+f654be6  0.602700         0.0        discard  03 stricter merge frequency
+```
+
+The loop shows a real tokenizer tradeoff. A smaller vocabulary leaves useful
+merges on the table. A larger vocabulary compresses this tiny repetitive corpus
+more aggressively. A stricter merge-frequency threshold stops too early, even
+with the larger requested vocabulary.
+
 ## Try Next
 
 Change `VOCAB_SIZE` or `MIN_PAIR_FREQUENCY` in `candidate.sh`, rerun the

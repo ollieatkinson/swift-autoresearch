@@ -54,6 +54,25 @@ That makes this the right first example when changing the evaluator or result
 logging. If this example fails, the issue is probably in the harness contract,
 not in GPU kernels or model architecture.
 
+## Autoresearch Loop
+
+I ran this as a local loop by letting the evaluator append to its ignored
+`results.tsv`, editing `candidate.sh` between runs, and restoring the checked-in
+candidate afterward:
+
+```text
+commit   val_bpb   memory_gb  status   description
+f654be6  5.239434  0.0        keep     00 baseline learning rate
+f654be6  6.041033  0.0        discard  01 lower learning rate
+f654be6  5.136839  0.0        keep     02 double time budget
+f654be6  7.192342  0.0        discard  03 too high learning rate
+```
+
+The useful behavior is that the evaluator makes tradeoffs visible even in the
+smallest backend. Lowering the learning rate under-trained in the one-second
+budget, doubling the budget improved the score, and pushing the learning rate
+too high made held-out BPB worse.
+
 ## Try Next
 
 Change `LEARNING_RATE` or `TIME_BUDGET` in `candidate.sh`, rerun the evaluator,

@@ -223,6 +223,7 @@ mutable candidate, and metric:
 - [03 MLX BPE Smoke](Examples/03-mlx-bpe-smoke/README.md)
 - [04 Alice Gutenberg](Examples/04-alice-gutenberg/README.md)
 - [05 UK Crime Holdout](Examples/05-uk-crime-holdout/README.md)
+- [06 Swift Package Performance](Examples/06-swift-package-performance/README.md)
 
 ## Output Fields
 
