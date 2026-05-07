@@ -106,14 +106,14 @@ struct TrainTokenizer: ParsableCommand {
 
 struct Train: ParsableCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Run the fixed-time Swift autoresearch baseline."
+        abstract: "Run fixed-time Swift autoresearch training."
     )
 
     @Option(name: .customLong("cache-dir"), help: "Cache directory. Defaults to AUTORESEARCH_CACHE_DIR or ~/.cache/swift-autoresearch.")
     var cacheDirectory: String?
 
-    @Option(name: .customLong("backend"), help: "Training backend: bigram or mlx.")
-    var backend: Backend = .bigram
+    @Option(name: .customLong("backend"), help: "Training backend: auto, mlx, or bigram. Auto prefers MLX and falls back to bigram when MLX setup is unavailable.")
+    var backend: Backend = .auto
 
     @Option(name: .customLong("tokenizer"), help: "Tokenizer: byte or bpe.")
     var tokenizer: TokenizerArgument = .byte
@@ -136,7 +136,7 @@ struct Train: ParsableCommand {
     @Option(name: .customLong("eval-tokens"), help: "Validation tokens to evaluate.")
     var evalTokens = 40 * 524_288
 
-    @Option(name: .customLong("learning-rate"), help: "Optimizer learning rate. Defaults to 0.25 for bigram and 0.001 for MLX.")
+    @Option(name: .customLong("learning-rate"), help: "Optimizer learning rate. Defaults to 0.001 for MLX and 0.25 for bigram.")
     var learningRate: Double?
 
     @Option(name: .customLong("weight-decay"), help: "Optimizer weight decay.")
@@ -162,35 +162,56 @@ struct Train: ParsableCommand {
 
     mutating func run() throws {
         let paths = CachePaths(root: cacheDirectory.map(expandedFileURL) ?? CachePaths.defaultRoot())
-        let resolvedBackend = TrainingBackend(rawValue: backend.rawValue) ?? .bigram
-        let config = TrainingConfig(
-            backend: resolvedBackend,
-            tokenizer: TokenizerKind(rawValue: tokenizer.rawValue) ?? .byte,
-            tokenizerFile: tokenizerFile.map(expandedFileURL),
-            sequenceLength: maxSequenceLength,
-            timeBudget: timeBudget,
-            evalTokens: evalTokens,
-            totalBatchSize: totalBatchSize,
-            deviceBatchSize: deviceBatchSize,
-            learningRate: learningRate ?? backend.defaultLearningRate,
-            weightDecay: weightDecay,
-            mlxModel: MLXModelConfig(
-                layerCount: mlxLayerCount,
-                modelDimension: mlxModelDimension,
-                headCount: mlxHeadCount,
-                mlpDimension: mlxMLPDimension,
-                windowPattern: mlxWindowPattern
-            ),
-            mlxDevice: MLXDevicePreference(rawValue: mlxDevice.rawValue) ?? .cpu
-        )
 
         do {
-            if resolvedBackend == .mlx {
-                try MLXMetallib.installIfNeeded()
-            }
+            let resolvedBackend = try resolveBackend()
+            let config = TrainingConfig(
+                backend: resolvedBackend,
+                tokenizer: TokenizerKind(rawValue: tokenizer.rawValue) ?? .byte,
+                tokenizerFile: tokenizerFile.map(expandedFileURL),
+                sequenceLength: maxSequenceLength,
+                timeBudget: timeBudget,
+                evalTokens: evalTokens,
+                totalBatchSize: totalBatchSize,
+                deviceBatchSize: deviceBatchSize,
+                learningRate: learningRate ?? resolvedBackend.defaultLearningRate,
+                weightDecay: weightDecay,
+                mlxModel: MLXModelConfig(
+                    layerCount: mlxLayerCount,
+                    modelDimension: mlxModelDimension,
+                    headCount: mlxHeadCount,
+                    mlpDimension: mlxMLPDimension,
+                    windowPattern: mlxWindowPattern
+                ),
+                mlxDevice: MLXDevicePreference(rawValue: mlxDevice.rawValue) ?? .cpu
+            )
             _ = try AutoresearchTrainer(config: config, paths: paths).run()
         } catch let error as AutoresearchError {
             throw ValidationError(error.description)
+        }
+    }
+
+    private func resolveBackend() throws -> TrainingBackend {
+        switch backend {
+        case .auto:
+            do {
+                try MLXMetallib.installIfNeeded()
+                console("backend: mlx (auto)")
+                return .mlx
+            } catch {
+                if tokenizer == .bpe || tokenizerFile != nil {
+                    throw ValidationError(
+                        "Auto backend could not use MLX for BPE tokenization: \(error.localizedDescription)"
+                    )
+                }
+                console("backend: bigram (auto fallback; MLX unavailable: \(error.localizedDescription))")
+                return .bigram
+            }
+        case .mlx:
+            try MLXMetallib.installIfNeeded()
+            return .mlx
+        case .bigram:
+            return .bigram
         }
     }
 }
@@ -275,9 +296,12 @@ private func console(_ message: String) {
 }
 
 enum Backend: String, ExpressibleByArgument {
+    case auto
     case bigram
     case mlx
+}
 
+private extension TrainingBackend {
     var defaultLearningRate: Double {
         switch self {
         case .bigram: 0.25

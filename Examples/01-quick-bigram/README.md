@@ -4,6 +4,11 @@ Beginner example. This is the smallest useful language-model example in the
 repo: it prepares a tiny checked-in corpus, trains the byte bigram backend, and
 turns the run into a `val_bpb` score.
 
+This example deliberately pins `--backend bigram` inside `evaluate.sh`. The
+plain `swift run autoresearch train` command defaults to `auto`, which prefers
+MLX, but this example is meant to exercise the dependency-light harness without
+MLX.
+
 ## Run It
 
 ```bash
@@ -33,6 +38,11 @@ fewer bits, on average, to predict each held-out byte.
 The useful moment is seeing the harness work without MLX: `candidate.sh` is the
 only mutable file, but the evaluator prepares data, trains, parses the summary,
 and produces a comparable score.
+
+`training_backend: bigram` is the sanity check that the example did what it was
+designed to do. Backend choice is not a candidate knob here; `candidate.sh`
+only changes the training budget, optimizer, sequence length, batch size, and
+evaluation token count.
 
 ## Demonstrated Local Run
 

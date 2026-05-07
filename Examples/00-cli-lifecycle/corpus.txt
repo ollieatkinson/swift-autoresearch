@@ -1,0 +1,16 @@
+dispatch note: green signals clear the route and trains depart on time
+dispatch note: green signals clear the route and trains depart on time
+dispatch note: amber signals hold the route and trains wait at the platform
+dispatch note: amber signals hold the route and trains wait at the platform
+dispatch note: red signals close the route and trains stop before the junction
+dispatch note: red signals close the route and trains stop before the junction
+
+lab note: clean samples improve the model and lower held-out surprise
+lab note: clean samples improve the model and lower held-out surprise
+lab note: noisy samples confuse the model and raise held-out surprise
+lab note: noisy samples confuse the model and raise held-out surprise
+
+research note: prepare creates train and validation text files
+research note: train-tokenizer turns repeated byte sequences into fewer tokens
+research note: train consumes the prepared cache and reports validation bits per byte
+research note: evaluate wraps those commands in a repeatable scoring contract

@@ -23,6 +23,10 @@ The bigram backend is intentionally limited. It is useful because it exercises
 the autoresearch harness quickly without requiring MLX, a tokenizer artifact,
 or a large model.
 
+The evaluator pins `swift run autoresearch train --backend bigram`. This is
+intentional: the normal training command defaults to `auto` and prefers MLX,
+but this problem is the quick bigram harness check.
+
 ## Evaluate
 
 ```bash
@@ -56,6 +60,9 @@ learning_rate: ...
 Use `val_bpb` as the score. Lower is better because it means the model needed
 fewer bits, on average, to predict each held-out byte. The progress lines are
 diagnostic; the final `val_bpb` is the comparison point.
+
+The final `training_backend: bigram` line confirms that this example used the
+forced bigram path rather than the CLI's default auto backend.
 
 The aha moment is the evaluator contract: `candidate.sh` is the only mutable
 file, but the command prepares data, trains, parses the model summary, and

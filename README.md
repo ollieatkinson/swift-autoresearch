@@ -70,6 +70,17 @@ swift run autoresearch evaluate \
 The evaluator prints the parsed metric. Remove `--no-results` when you want to
 append a scored row to the example `results.tsv`.
 
+For a direct tour of the individual commands before they are wrapped by
+`evaluate`, run:
+
+```bash
+bash Examples/00-cli-lifecycle/run.sh
+```
+
+That walkthrough prepares a tiny corpus, writes an isolated cache under
+`.build/00-cli-lifecycle/`, trains a BPE tokenizer artifact, and runs the
+default trainer against the prepared split.
+
 ## Data Preparation
 
 `prepare` accepts a UTF-8 text file or a directory of `.txt` files:
@@ -89,19 +100,27 @@ Use `--cache-dir` or `AUTORESEARCH_CACHE_DIR` to choose a different cache root.
 
 ## Training
 
-The default backend is the fast byte bigram harness:
+The default backend selection is `auto`: it prepares MLX, trains with MLX when
+available, and falls back to the byte bigram harness when MLX setup is
+unavailable:
 
 ```bash
 swift run autoresearch train
 ```
 
-Run the MLX backend on the Apple GPU:
+Force the MLX backend on the Apple GPU:
 
 ```bash
 swift run autoresearch train \
   --backend mlx \
   --mlx-device gpu \
   --time-budget 300
+```
+
+Force the dependency-light byte bigram harness:
+
+```bash
+swift run autoresearch train --backend bigram
 ```
 
 Common MLX controls:
@@ -215,9 +234,11 @@ commit	score	memory_gb	status	description
 
 ## Examples
 
-Each example directory has its own README, corpus or data source, evaluator,
-mutable candidate, and metric:
+The first example is a direct CLI lifecycle tour. The remaining examples are
+evaluator-backed research loops with their own README, corpus or data source,
+evaluator, mutable candidate, and metric:
 
+- [00 CLI Lifecycle](Examples/00-cli-lifecycle/README.md)
 - [01 Quick Bigram](Examples/01-quick-bigram/README.md)
 - [02 BPE Tokenizer Compression](Examples/02-bpe-tokenizer-compression/README.md)
 - [03 MLX BPE Smoke](Examples/03-mlx-bpe-smoke/README.md)
@@ -226,7 +247,8 @@ mutable candidate, and metric:
 - [06 Swift Package Performance](Examples/06-swift-package-performance/README.md)
 
 Each example also includes an `EXAMPLE_PROMPT.md` file with a paste-ready prompt
-for Codex, Claude Code, or another coding agent.
+for Codex, Claude Code, or another coding agent. The CLI lifecycle example is
+the exception: it is meant for humans reading and running the raw subcommands.
 
 <details>
 <summary>Generic Agent Prompt</summary>
